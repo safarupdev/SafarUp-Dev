@@ -1,79 +1,52 @@
 /**
- * Audit log model — PRD §59 (Audit Log) and §77 (Admin Auditability).
+ * Audit log model — PRD §59 (Audit Log) and §77 (Admin Auditability),
+ * backed by Firestore.
  *
- * Fields per §59: _id, actorId (ref users), actorRole, action, entityType,
+ * Fields per §59: id, actorId (ref users), actorRole, action, entityType,
  * entityId, before, after, timestamp, ipMetadata.
  *
- * "Avoid storing unnecessary sensitive information." — §59. We store
- * before/after as plain objects (Mixed) so any entity type can be audited
+ * "Avoid storing unnecessary sensitive information." — §59. `before`/
+ * `after` are stored as plain maps so any entity type can be audited
  * generically, but callers are responsible for stripping secrets
  * (password hashes, payment credentials, etc.) before passing them in —
  * see utils/auditLog.js.
+ *
+ * Audit logs are append-only: this module intentionally exposes no
+ * update/delete functions (§59, §77 — auditability requires the log
+ * itself to be tamper-resistant). Firestore auto-generates the document
+ * ID via `.add()`.
  */
 
-const { Schema, model } = require('mongoose');
+const { getFirestore } = require('../config/database');
 
-const auditLogSchema = new Schema(
-  {
-    // Not required: some events (e.g. a failed admin login attempt) have
-    // no known actor. `actorRole` covers those cases with sentinel values
-    // like "UNKNOWN" (see utils/auditLog.js), so it is intentionally a
-    // free-form string rather than restricted to the real user-role enum.
-    actorId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: false,
-      default: null,
-      index: true,
-    },
-    actorRole: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    action: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    entityType: {
-      type: String,
-      required: true,
-      trim: true,
-      index: true,
-    },
-    entityId: {
-      type: Schema.Types.ObjectId,
-      required: false,
-      index: true,
-    },
-    before: {
-      type: Schema.Types.Mixed,
-      default: null,
-    },
-    after: {
-      type: Schema.Types.Mixed,
-      default: null,
-    },
-    timestamp: {
-      type: Date,
-      default: Date.now,
-      required: true,
-    },
-    ipMetadata: {
-      ip: { type: String, default: null },
-      userAgent: { type: String, default: null },
-    },
-  },
-  {
-    timestamps: false, // this model has its own `timestamp` field per §59
-  }
-);
+const COLLECTION = 'auditLogs';
 
-// Audit logs are append-only: no update/delete helpers are exposed
-// anywhere in the codebase on purpose (§59, §77 — auditability requires
-// the log itself to be tamper-resistant).
+/**
+ * @param {object} entry
+ * @param {string | null} entry.actorId
+ * @param {string} entry.actorRole
+ * @param {string} entry.action
+ * @param {string} entry.entityType
+ * @param {string | null} [entry.entityId]
+ * @param {object | null} [entry.before]
+ * @param {object | null} [entry.after]
+ * @param {{ ip: string | null, userAgent: string | null }} [entry.ipMetadata]
+ */
+async function create(entry) {
+  const db = getFirestore();
+  const document = {
+    actorId: entry.actorId ?? null,
+    actorRole: entry.actorRole,
+    action: entry.action,
+    entityType: entry.entityType,
+    entityId: entry.entityId ?? null,
+    before: entry.before ?? null,
+    after: entry.after ?? null,
+    timestamp: new Date(),
+    ipMetadata: entry.ipMetadata ?? null,
+  };
+  const ref = await db.collection(COLLECTION).add(document);
+  return { _id: ref.id, id: ref.id, ...document };
+}
 
-const AuditLog = model('AuditLog', auditLogSchema);
-
-module.exports = { AuditLog };
+module.exports = { COLLECTION, create };

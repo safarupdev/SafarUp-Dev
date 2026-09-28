@@ -12,7 +12,6 @@
 require('dotenv').config();
 
 const REQUIRED_IN_PRODUCTION = [
-  'MONGODB_URI',
   'JWT_ACCESS_SECRET',
   'JWT_REFRESH_SECRET',
 ];
@@ -43,7 +42,15 @@ const env = {
     .map((origin) => origin.trim())
     .filter(Boolean),
 
-  mongoUri: requireEnv('MONGODB_URI', 'mongodb://127.0.0.1:27017/safarup-dev'),
+  // Firebase/Firestore — PRD §10, §93. Exactly one credential source is
+  // required: a full service-account JSON blob (recommended for
+  // production secret managers), a path to a downloaded key file
+  // (common for local dev), or ambient GOOGLE_APPLICATION_CREDENTIALS.
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID || undefined,
+    serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || undefined,
+    serviceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || undefined,
+  },
 
   jwt: {
     accessSecret: requireEnv('JWT_ACCESS_SECRET', 'dev-only-insecure-access-secret'),
@@ -70,6 +77,12 @@ const env = {
 if (isProduction) {
   for (const key of REQUIRED_IN_PRODUCTION) {
     requireEnv(key);
+  }
+  if (!env.firebase.serviceAccountJson && !env.firebase.serviceAccountPath) {
+    throw new Error(
+      'Missing Firebase credentials. Set FIREBASE_SERVICE_ACCOUNT_JSON or ' +
+        'FIREBASE_SERVICE_ACCOUNT_PATH. Refusing to start in production without them.'
+    );
   }
 }
 

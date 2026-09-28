@@ -1,50 +1,104 @@
 /**
- * MongoDB connection — PRD §10 (Database) and §93 (Database Environment Strategy).
+ * Firestore connection — PRD §10 (Database) and §93 (Database Environment
+ * Strategy).
  *
- * "Each environment gets its own connection string (MONGODB_URI) supplied
- * via environment variables, never hardcoded." — §93
+ * "Each environment gets its own connection string/project supplied via
+ * environment variables, never hardcoded." — §93. Here that means a
+ * separate Firebase project per environment (safarup-dev, safarup-staging,
+ * safarup-production), selected entirely by which service account
+ * credentials are loaded — never a hardcoded project ID.
+ *
+ * Authentication to Firebase stays custom (JWT + bcrypt, PRD §30) — this
+ * module only initializes the Firebase Admin SDK so the backend can read
+ * and write Firestore documents. It does NOT use Firebase Authentication.
  */
 
-const mongoose = require('mongoose');
+const admin = require('firebase-admin');
 const env = require('./env');
 const logger = require('../utils/logger');
 
-mongoose.set('strictQuery', true);
+let app = null;
+let firestore = null;
 
-let isConnected = false;
-
-async function connectDatabase() {
-  if (isConnected) {
-    return mongoose.connection;
+function loadServiceAccount() {
+  // Preferred in production: the full service account JSON as a single
+  // env var (e.g. pasted into a secret manager) — avoids shipping a key
+  // file at all. See PRD §95 (Secrets: never commit credentials to Git).
+  if (env.firebase.serviceAccountJson) {
+    try {
+      return JSON.parse(env.firebase.serviceAccountJson);
+    } catch (error) {
+      throw new Error(`FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON: ${error.message}`);
+    }
   }
 
-  mongoose.connection.on('connected', () => {
-    isConnected = true;
-    logger.info(`MongoDB connected: ${mongoose.connection.name}`);
-  });
+  // Alternative: a path to a downloaded service account key file (common
+  // for local development). Never commit this file — see .gitignore.
+  if (env.firebase.serviceAccountPath) {
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    return require(env.firebase.serviceAccountPath);
+  }
 
-  mongoose.connection.on('error', (error) => {
-    logger.error('MongoDB connection error', { error: error.message });
-  });
+  return null;
+}
 
-  mongoose.connection.on('disconnected', () => {
-    isConnected = false;
-    logger.warn('MongoDB disconnected');
-  });
+async function connectDatabase() {
+  if (firestore) {
+    return firestore;
+  }
 
-  await mongoose.connect(env.mongoUri, {
-    autoIndex: !env.isProduction,
-    // Fail fast rather than retrying/hanging indefinitely if no MongoDB
-    // instance is reachable (e.g. missing/misconfigured MONGODB_URI).
-    serverSelectionTimeoutMS: 8000,
-  });
+  const serviceAccount = loadServiceAccount();
 
-  return mongoose.connection;
+  if (!serviceAccount && !env.isProduction) {
+    // Local/dev convenience: if GOOGLE_APPLICATION_CREDENTIALS is set, or
+    // the Firebase emulator suite is running, admin.initializeApp() with
+    // just a projectId can still work. We surface a clear error instead
+    // of silently connecting to nothing.
+    if (!env.firebase.projectId) {
+      throw new Error(
+        'No Firebase credentials configured. Set FIREBASE_SERVICE_ACCOUNT_JSON, ' +
+          'FIREBASE_SERVICE_ACCOUNT_PATH, or GOOGLE_APPLICATION_CREDENTIALS in your .env.'
+      );
+    }
+  }
+
+  app =
+    admin.apps.length > 0
+      ? admin.app()
+      : admin.initializeApp({
+          credential: serviceAccount
+            ? admin.credential.cert(serviceAccount)
+            : admin.credential.applicationDefault(),
+          projectId: env.firebase.projectId || serviceAccount?.project_id,
+        });
+
+  firestore = admin.firestore();
+  firestore.settings({ ignoreUndefinedProperties: true });
+
+  // Firestore has no explicit "connect" call — this is a lightweight
+  // reachability check so the server can fail fast on boot (matching the
+  // previous MongoDB behavior) instead of only discovering a bad
+  // credential/project ID on the first real request.
+  await firestore.collection('__healthcheck__').limit(1).get();
+
+  logger.info(`Firestore connected [project: ${app.options.projectId || 'unknown'}]`);
+
+  return firestore;
+}
+
+function getFirestore() {
+  if (!firestore) {
+    throw new Error('Firestore has not been initialized. Call connectDatabase() first.');
+  }
+  return firestore;
 }
 
 async function disconnectDatabase() {
-  await mongoose.disconnect();
-  isConnected = false;
+  if (app) {
+    await app.delete();
+  }
+  app = null;
+  firestore = null;
 }
 
-module.exports = { connectDatabase, disconnectDatabase, mongoose };
+module.exports = { connectDatabase, disconnectDatabase, getFirestore, admin };

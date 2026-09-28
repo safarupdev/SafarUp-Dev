@@ -2,3 +2,7 @@ node_modules/
 .env
 .env.local
 *.log
+
+# Firebase service account keys must never be committed (PRD §95)
+*serviceAccount*.json
+firebase-adminsdk-*.json

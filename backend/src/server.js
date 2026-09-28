@@ -1,5 +1,5 @@
 /**
- * Process entry point: connect to MongoDB, then start the HTTP server.
+ * Process entry point: connect to Firestore, then start the HTTP server.
  * Refuses to serve traffic if the database connection fails on boot
  * (fail fast rather than run in a broken state).
  */
@@ -13,7 +13,7 @@ async function start() {
   try {
     await connectDatabase();
   } catch (error) {
-    logger.error('Failed to connect to MongoDB. Server will not start.', {
+    logger.error('Failed to connect to Firestore. Server will not start.', {
       error: error.message,
     });
     process.exit(1);

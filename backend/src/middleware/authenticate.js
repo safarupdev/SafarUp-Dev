@@ -11,7 +11,7 @@
  */
 
 const { verifyAccessToken } = require('../utils/tokens');
-const { User } = require('../models/User.model');
+const User = require('../models/User.model');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 
@@ -39,8 +39,7 @@ const authenticate = asyncHandler(async function authenticate(req, _res, next) {
     throw ApiError.unauthorized('Invalid or expired session. Please log in again.');
   }
 
-  // +tokenVersion is required because it is `select: false` by default.
-  const user = await User.findById(payload.sub).select('+tokenVersion');
+  const user = await User.findById(payload.sub, { includeSecrets: true });
   if (!user) {
     throw ApiError.unauthorized('Account no longer exists');
   }
@@ -54,7 +53,13 @@ const authenticate = asyncHandler(async function authenticate(req, _res, next) {
     throw ApiError.unauthorized('Session has been invalidated. Please log in again.');
   }
 
-  req.user = user;
+  // req.user must never carry passwordHash/tokens — controllers (e.g.
+  // GET /auth/me) return req.user directly in API responses.
+  req.user = User.stripSecrets(user);
+  // Some downstream code (rate limiting keys, audit logs) may still need
+  // tokenVersion/role checks against the raw DB record; attach it
+  // separately rather than on the public-facing object.
+  req.authUser = user;
   next();
 });
 
@@ -69,9 +74,10 @@ const authenticateOptional = asyncHandler(async function authenticateOptional(re
 
   try {
     const payload = verifyAccessToken(token);
-    const user = await User.findById(payload.sub).select('+tokenVersion');
+    const user = await User.findById(payload.sub, { includeSecrets: true });
     if (user && user.status === 'active' && payload.tokenVersion === user.tokenVersion) {
-      req.user = user;
+      req.user = User.stripSecrets(user);
+      req.authUser = user;
     }
   } catch {
     // Silently ignore — this endpoint does not require authentication.

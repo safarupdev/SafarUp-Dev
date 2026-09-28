@@ -4,10 +4,13 @@
  * Kept separate from the controller (thin HTTP layer) so the same logic
  * could be reused by, e.g., an admin-invite flow or a seed script without
  * going through Express.
+ *
+ * Backed by Firestore via models/User.model.js (see that file for the
+ * document shape and why email is used as the document ID).
  */
 
 const bcrypt = require('bcryptjs');
-const { User } = require('../models/User.model');
+const User = require('../models/User.model');
 const { ROLES } = require('../constants/roles');
 const env = require('../config/env');
 const ApiError = require('../utils/ApiError');
@@ -52,32 +55,34 @@ async function register({ fullName, email, password }) {
     verificationToken,
   });
 
-  return user;
+  return User.stripSecrets(user);
 }
 
 async function verifyEmail(rawToken) {
   const tokenHash = hashToken(rawToken);
-  const user = await User.findOne({
-    emailVerificationToken: tokenHash,
-    emailVerificationExpires: { $gt: new Date() },
-  }).select('+emailVerificationToken +emailVerificationExpires');
+  const user = await User.findOneByUnexpiredToken(
+    'emailVerificationToken',
+    'emailVerificationExpires',
+    tokenHash
+  );
 
   if (!user) {
     throw ApiError.badRequest('Verification link is invalid or has expired');
   }
 
-  user.emailVerified = true;
-  user.emailVerificationToken = null;
-  user.emailVerificationExpires = null;
-  await user.save();
+  await User.updateById(user._id, {
+    emailVerified: true,
+    emailVerificationToken: null,
+    emailVerificationExpires: null,
+  });
 
   await emailService.sendWelcomeEmail({ to: user.email, displayName: user.displayName });
 
-  return user;
+  return User.stripSecrets({ ...user, emailVerified: true });
 }
 
 async function resendVerificationEmail(email) {
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email }, { includeSecrets: true });
   // Always respond as if it succeeded (enumeration hardening) — the
   // controller returns a generic message regardless of `user` existing.
   if (!user || user.emailVerified) {
@@ -85,9 +90,10 @@ async function resendVerificationEmail(email) {
   }
 
   const verificationToken = generateToken();
-  user.emailVerificationToken = hashToken(verificationToken);
-  user.emailVerificationExpires = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
-  await user.save();
+  await User.updateById(user._id, {
+    emailVerificationToken: hashToken(verificationToken),
+    emailVerificationExpires: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+  });
 
   await emailService.sendVerificationEmail({
     to: user.email,
@@ -106,10 +112,10 @@ async function resendVerificationEmail(email) {
  *   1. Authentication 2. Authorization 3. Backend operation level") so a
  *   CUSTOMER credential can never establish an admin session, and a staff
  *   credential can never accidentally be treated as a customer session.
- * @returns {{ user: import('../models/User.model').User, accessToken: string, refreshToken: string }}
+ * @returns {{ user: object, accessToken: string, refreshToken: string }}
  */
 async function login({ email, password, allowedRoles }) {
-  const user = await User.findOne({ email }).select('+passwordHash +tokenVersion');
+  const user = await User.findOne({ email }, { includeSecrets: true });
   if (!user || !user.passwordHash) {
     // Same message whether the email doesn't exist or the password is
     // wrong — never reveal which one it was.
@@ -139,21 +145,21 @@ async function login({ email, password, allowedRoles }) {
     throw ApiError.unauthorized('Invalid email or password');
   }
 
-  user.lastLoginAt = new Date();
-  await user.save();
+  const lastLoginAt = new Date();
+  await User.updateById(user._id, { lastLoginAt });
 
   const tokens = issueTokenPair(user);
-  return { user, ...tokens };
+  return { user: User.stripSecrets({ ...user, lastLoginAt }), ...tokens };
 }
 
 function issueTokenPair(user) {
   const accessToken = signAccessToken({
-    sub: user._id.toString(),
+    sub: user._id,
     role: user.role,
     tokenVersion: user.tokenVersion,
   });
   const refreshToken = signRefreshToken({
-    sub: user._id.toString(),
+    sub: user._id,
     tokenVersion: user.tokenVersion,
   });
   return { accessToken, refreshToken };
@@ -176,12 +182,12 @@ async function refreshSession(refreshToken) {
     throw ApiError.unauthorized('Session expired. Please log in again.');
   }
 
-  const user = await User.findById(payload.sub).select('+tokenVersion');
+  const user = await User.findById(payload.sub, { includeSecrets: true });
   if (!user || user.status !== 'active' || payload.tokenVersion !== user.tokenVersion) {
     throw ApiError.unauthorized('Session expired. Please log in again.');
   }
 
-  return { user, ...issueTokenPair(user) };
+  return { user: User.stripSecrets(user), ...issueTokenPair(user) };
 }
 
 /**
@@ -197,9 +203,10 @@ async function forgotPassword(email, audience = 'public') {
   }
 
   const resetToken = generateToken();
-  user.passwordResetToken = hashToken(resetToken);
-  user.passwordResetExpires = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
-  await user.save();
+  await User.updateById(user._id, {
+    passwordResetToken: hashToken(resetToken),
+    passwordResetExpires: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+  });
 
   await emailService.sendPasswordResetEmail({
     to: user.email,
@@ -211,24 +218,28 @@ async function forgotPassword(email, audience = 'public') {
 
 async function resetPassword({ token, password }) {
   const tokenHash = hashToken(token);
-  const user = await User.findOne({
-    passwordResetToken: tokenHash,
-    passwordResetExpires: { $gt: new Date() },
-  }).select('+passwordResetToken +passwordResetExpires +tokenVersion');
+  const user = await User.findOneByUnexpiredToken(
+    'passwordResetToken',
+    'passwordResetExpires',
+    tokenHash
+  );
 
   if (!user) {
     throw ApiError.badRequest('Reset link is invalid or has expired');
   }
 
-  user.passwordHash = await bcrypt.hash(password, env.bcryptSaltRounds);
-  user.passwordResetToken = null;
-  user.passwordResetExpires = null;
-  // Invalidate every previously issued refresh token — a password reset
-  // must log the user out everywhere else too.
-  user.tokenVersion += 1;
-  await user.save();
+  const passwordHash = await bcrypt.hash(password, env.bcryptSaltRounds);
 
-  return user;
+  await User.updateById(user._id, {
+    passwordHash,
+    passwordResetToken: null,
+    passwordResetExpires: null,
+    // Invalidate every previously issued refresh token — a password reset
+    // must log the user out everywhere else too.
+    tokenVersion: (user.tokenVersion || 0) + 1,
+  });
+
+  return User.stripSecrets(user);
 }
 
 module.exports = {

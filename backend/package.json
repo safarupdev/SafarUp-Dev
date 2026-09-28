@@ -2,7 +2,7 @@
   "name": "backend",
   "version": "0.1.0",
   "private": true,
-  "description": "SafarUp backend API (Node.js + Express + MongoDB, JavaScript)",
+  "description": "SafarUp backend API (Node.js + Express + Firebase/Firestore, JavaScript)",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
@@ -19,8 +19,8 @@
     "express": "^4.19.2",
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
+    "firebase-admin": "^12.3.1",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.5.2",
     "nodemailer": "^10.0.12",
     "morgan": "^1.10.0",
     "zod": "^3.23.8"

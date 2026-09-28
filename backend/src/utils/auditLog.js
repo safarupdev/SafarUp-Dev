@@ -7,16 +7,16 @@
  * an audit-logging bug must not break the underlying business operation.
  */
 
-const { AuditLog } = require('../models/AuditLog.model');
+const AuditLog = require('../models/AuditLog.model');
 const logger = require('./logger');
 
 /**
  * @param {object} params
- * @param {import('mongoose').Types.ObjectId | string} params.actorId
+ * @param {string | null} params.actorId
  * @param {string} params.actorRole
  * @param {string} params.action e.g. "BOOKING_CANCELLED", "TRIP_PUBLISHED"
  * @param {string} params.entityType e.g. "Booking", "TripTemplate"
- * @param {import('mongoose').Types.ObjectId | string} [params.entityId]
+ * @param {string} [params.entityId]
  * @param {object} [params.before]
  * @param {object} [params.after]
  * @param {import('express').Request} [params.req] used to extract IP/user-agent
@@ -36,7 +36,7 @@ async function recordAuditLog({ actorId, actorRole, action, entityType, entityId
             ip: req.ip,
             userAgent: req.headers['user-agent'] || null,
           }
-        : undefined,
+        : null,
     });
   } catch (error) {
     logger.error('Failed to write audit log', {

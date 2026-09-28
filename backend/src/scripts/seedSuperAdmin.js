@@ -17,7 +17,7 @@
 
 const bcrypt = require('bcryptjs');
 const { connectDatabase, disconnectDatabase } = require('../config/database');
-const { User } = require('../models/User.model');
+const User = require('../models/User.model');
 const { ROLES } = require('../constants/roles');
 const env = require('../config/env');
 const logger = require('../utils/logger');
@@ -86,7 +86,7 @@ async function main() {
   });
 
   logger.info('Super Admin created successfully.', {
-    id: superAdmin._id.toString(),
+    id: superAdmin._id,
     email: superAdmin.email,
   });
 
