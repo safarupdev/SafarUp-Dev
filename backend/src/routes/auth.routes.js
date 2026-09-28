@@ -6,7 +6,12 @@ const { Router } = require('express');
 const authController = require('../controllers/auth.controller');
 const { authenticate } = require('../middleware/authenticate');
 const validate = require('../middleware/validate');
-const { loginLimiter, registerLimiter, passwordResetLimiter } = require('../middleware/rateLimit');
+const {
+  loginLimiter,
+  registerLimiter,
+  passwordResetLimiter,
+  adminLoginLimiter,
+} = require('../middleware/rateLimit');
 const {
   registerSchema,
   loginSchema,
@@ -27,6 +32,12 @@ router.post(
   authController.resendVerification
 );
 router.post('/login', loginLimiter, validate(loginSchema), authController.login);
+router.post(
+  '/admin/login',
+  adminLoginLimiter,
+  validate(loginSchema),
+  authController.adminLogin
+);
 router.post('/refresh', authController.refresh);
 router.post('/logout', authController.logout);
 router.post(
@@ -34,6 +45,12 @@ router.post(
   passwordResetLimiter,
   validate(forgotPasswordSchema),
   authController.forgotPassword
+);
+router.post(
+  '/admin/forgot-password',
+  passwordResetLimiter,
+  validate(forgotPasswordSchema),
+  authController.adminForgotPassword
 );
 router.post(
   '/reset-password',

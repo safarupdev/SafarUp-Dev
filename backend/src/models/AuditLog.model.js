@@ -12,20 +12,24 @@
  */
 
 const { Schema, model } = require('mongoose');
-const { ALL_ROLES } = require('../constants/roles');
 
 const auditLogSchema = new Schema(
   {
+    // Not required: some events (e.g. a failed admin login attempt) have
+    // no known actor. `actorRole` covers those cases with sentinel values
+    // like "UNKNOWN" (see utils/auditLog.js), so it is intentionally a
+    // free-form string rather than restricted to the real user-role enum.
     actorId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
+      default: null,
       index: true,
     },
     actorRole: {
       type: String,
-      enum: ALL_ROLES,
       required: true,
+      trim: true,
     },
     action: {
       type: String,

@@ -97,9 +97,18 @@ async function resendVerificationEmail(email) {
 }
 
 /**
+ * @param {object} params
+ * @param {string} params.email
+ * @param {string} params.password
+ * @param {string[]} [params.allowedRoles] If provided, login is rejected
+ *   for any user whose role is not in this list. Used by the admin app's
+ *   login endpoint (PRD §133: "Admin route protection must happen at:
+ *   1. Authentication 2. Authorization 3. Backend operation level") so a
+ *   CUSTOMER credential can never establish an admin session, and a staff
+ *   credential can never accidentally be treated as a customer session.
  * @returns {{ user: import('../models/User.model').User, accessToken: string, refreshToken: string }}
  */
-async function login({ email, password }) {
+async function login({ email, password, allowedRoles }) {
   const user = await User.findOne({ email }).select('+passwordHash +tokenVersion');
   if (!user || !user.passwordHash) {
     // Same message whether the email doesn't exist or the password is
@@ -120,6 +129,14 @@ async function login({ email, password }) {
     throw ApiError.forbidden('Please verify your email before logging in', {
       code: 'EMAIL_NOT_VERIFIED',
     });
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    // Deliberately the same generic message as "wrong password" — an
+    // attacker probing the admin login endpoint with a known customer
+    // email/password must not be able to distinguish "wrong credentials"
+    // from "correct credentials, wrong portal".
+    throw ApiError.unauthorized('Invalid email or password');
   }
 
   user.lastLoginAt = new Date();
@@ -167,7 +184,12 @@ async function refreshSession(refreshToken) {
   return { user, ...issueTokenPair(user) };
 }
 
-async function forgotPassword(email) {
+/**
+ * @param {string} email
+ * @param {'public' | 'admin'} [audience] Determines which app's URL the
+ *   reset link points to (see email.service.js sendPasswordResetEmail).
+ */
+async function forgotPassword(email, audience = 'public') {
   const user = await User.findOne({ email });
   if (!user || user.authProvider !== 'local') {
     // Do not reveal whether the account exists or is Google-only.
@@ -183,6 +205,7 @@ async function forgotPassword(email) {
     to: user.email,
     displayName: user.displayName,
     resetToken,
+    audience,
   });
 }
 

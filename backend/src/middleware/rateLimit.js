@@ -40,4 +40,15 @@ const passwordResetLimiter = rateLimit({
   handler: limiterErrorHandler,
 });
 
-module.exports = { loginLimiter, registerLimiter, passwordResetLimiter };
+// Tighter than the customer login limiter — the admin portal is a smaller,
+// higher-value target (PRD §91: admin security requires strong access
+// control), so a stricter throttle is appropriate here.
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: limiterErrorHandler,
+});
+
+module.exports = { loginLimiter, registerLimiter, passwordResetLimiter, adminLoginLimiter };

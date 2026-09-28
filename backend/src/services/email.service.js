@@ -51,8 +51,16 @@ async function sendWelcomeEmail({ to, displayName }) {
   });
 }
 
-async function sendPasswordResetEmail({ to, displayName, resetToken }) {
-  const resetUrl = `${env.clientUrls.public}/reset-password?token=${resetToken}`;
+/**
+ * @param {object} params
+ * @param {'public' | 'admin'} [params.audience] Which frontend the reset
+ *   link should point to. Staff/admin accounts must receive a link to
+ *   admin.safarup.in, not safarup.in — otherwise a support/finance/admin
+ *   user resetting their password would be sent to the wrong app entirely.
+ */
+async function sendPasswordResetEmail({ to, displayName, resetToken, audience = 'public' }) {
+  const baseUrl = audience === 'admin' ? env.clientUrls.admin : env.clientUrls.public;
+  const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
   await sendMail({
     to,
     subject: 'Reset your SafarUp password',
