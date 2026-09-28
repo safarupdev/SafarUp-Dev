@@ -6,12 +6,14 @@
 | **Domain** | safarup.in |
 | **Admin** | admin.safarup.in |
 | **Document** | Master Product Requirements Document |
-| **Version** | 1.0 |
+| **Version** | 1.1 |
 | **Status** | Production Development Baseline |
 | **Date** | September 2026 |
 | **Product Type** | Digital Travel Company + Travel Commerce Platform |
 | **Primary Market** | India, initially Bihar-focused |
 | **Primary Currency** | INR (₹) |
+
+> **v1.1 changelog:** Replaced the Firebase/TypeScript stack (Firestore, Firebase Auth, Cloud Functions, Firebase Storage) with a JavaScript-only stack: React + Vite for `public`/`admin`, Node.js + Express + MongoDB (Mongoose) for `backend`, custom JWT/bcrypt authentication (Google OAuth supported, Apple Sign In deferred). This aligns the PRD with the actual repository scaffold. All data models in §51–59 are unchanged in shape, now expressed as MongoDB collections instead of Firestore documents.
 
 ---
 
@@ -100,7 +102,7 @@ safarup.in                    admin.safarup.in
                   │
    ┌──────────────┼──────────────┐
    ▼               ▼              ▼
-Firebase        Razorpay        Email
+MongoDB         Razorpay        Email
 ```
 
 ---
@@ -259,14 +261,16 @@ Role-based permissions must prevent unnecessary access.
 
 ```
 safarup/
-├── web/
+├── public/
 ├── admin/
 └── backend/
 ```
 
-- **web/** — Customer-facing SafarUp application.
-- **admin/** — Internal operations application.
-- **backend/** — Shared trusted backend/business logic.
+- **public/** — Customer-facing SafarUp application (React, JavaScript, Vite).
+- **admin/** — Internal operations application (React, JavaScript, Vite).
+- **backend/** — Shared trusted backend/business logic (Node.js, Express, MongoDB).
+
+> Naming note: this repository uses `public/` for the customer-facing app (matching the existing scaffold) instead of `web/`. All references to "web" elsewhere in this document refer to this `public/` application.
 
 ---
 
@@ -286,77 +290,79 @@ may be introduced later.
 
 ## 9. Technology Stack
 
-### 9.1 Web
+### 9.1 Web (`public`)
 
-- React
-- TypeScript
+- React (JavaScript, no TypeScript)
 - Vite
 - React Router
 - Tailwind CSS
-- shadcn/ui
 - TanStack Query
 - React Hook Form
-- Zod
+- Zod (runtime validation, used as plain JS schemas)
+- Axios (HTTP client)
 
 ### 9.2 Admin
 
-- React
-- TypeScript
+- React (JavaScript, no TypeScript)
 - Vite
 - Tailwind CSS
-- shadcn/ui
 - TanStack Query
 - React Hook Form
 - Zod
+- Axios
+- Recharts (or similar) for dashboard charts
 
 ### 9.3 Backend
 
-- Firebase
-- Cloud Functions
-- Firebase Admin SDK
-- TypeScript
+- Node.js
+- Express (JavaScript, no TypeScript)
+- Mongoose (MongoDB object modeling)
+- JSON Web Tokens (`jsonwebtoken`) for session/auth tokens
+- bcrypt for password hashing
+- Zod for request validation
+- node-cron for scheduled jobs (booking expiry sweep, reminders)
 
-Firebase Cloud Functions supports HTTPS requests and event-driven backend execution, making it appropriate for payment verification, booking workflows, scheduled jobs and other trusted operations.
+Express provides the HTTP routing and middleware layer for all trusted business logic: pricing, availability, booking state transitions, and payment verification. There is no serverless/Cloud Functions layer — the backend runs as a persistent Node.js process (`server.js` + `app.js`), matching the scaffold already in this repository.
 
 ### 9.4 Authentication
 
-Firebase Authentication.
+Custom authentication built on the Express backend (no Firebase Authentication).
 
-Supported:
-- Email/password
-- Google
-- Apple
+Supported in V1:
+- Email/password (bcrypt-hashed, JWT session)
+- Google OAuth (via `passport-google-oauth20` or equivalent)
 
-No phone OTP authentication in V1.
+Deferred to a later phase:
+- Apple Sign In
+- Phone OTP
 
-Firebase officially supports email/password, Google and Sign in with Apple authentication for web applications.
+Email verification is required for email/password accounts (verification token emailed on signup, confirmed via a backend endpoint).
 
-Email verification must be enabled for email/password accounts.
-
-> **Note (project deviation):** The current repo scaffold (`backend`, `public`, `admin`) was built in plain JavaScript/Express, not the Firebase + TypeScript stack described above. This PRD reflects the target architecture; a stack alignment decision is needed before Phase 1 build-out (see §149).
+Tokens are issued as short-lived access tokens + refresh tokens, stored in httpOnly secure cookies. Passwords are never stored in plaintext or returned in any API response.
 
 ---
 
 ## 10. Database
 
-**Primary database:** Cloud Firestore
+**Primary database:** MongoDB
 
-Firestore is the system of record for application data.
+MongoDB (accessed through Mongoose schemas/models) is the system of record for application data. It replaces Firestore in this architecture; document collections map directly to Mongoose collections/models (see §51–59 for the schema definitions, which apply unchanged to MongoDB collections).
 
 Security must use:
-- Firebase Authentication
-- Firestore Security Rules
-- Backend authorization
-- Firebase App Check where appropriate
+- Backend authentication (JWT) on every protected route
+- Backend authorization (role checks) on every admin route
+- Input validation (Zod) on every write endpoint
+- MongoDB connection restricted by network/IP allow-list and a dedicated database user with least-privilege access
 
-Firebase recommends Authentication + Firestore Security Rules for securing web/mobile access, with App Check available as an additional protection.
+There are no client-side security rules (no Firestore Security Rules equivalent) — **all access control is enforced in Express middleware**, since the browser never talks to the database directly.
 
 ---
 
 ## 11. Storage
 
-Firebase Storage. Used for:
+File/media storage is handled by the backend, not a client-facing cloud storage SDK.
 
+Used for:
 - Destination images
 - Trip images
 - Blog images
@@ -365,7 +371,7 @@ Firebase Storage. Used for:
 - Invoices where appropriate
 - Operational media
 
-Storage access must be governed by authenticated authorization and appropriate Storage Rules.
+**V1 approach:** uploads go through an authenticated Express endpoint (`multer` for multipart handling) and are stored either on local/attached disk (early development) or an S3-compatible object store (recommended before production launch). Storage access must be governed by authenticated authorization in the backend — never by exposing storage credentials to the browser.
 
 ---
 
@@ -390,11 +396,11 @@ Payment architecture:
 ```
 Customer
   ↓
-SafarUp
+SafarUp (public app)
   ↓
 Create booking intent
   ↓
-Backend
+Backend (Express)
   ↓
 Create Razorpay Order
   ↓
@@ -404,16 +410,16 @@ Payment
   ↓
 Razorpay callback/webhook
   ↓
-Backend verification
+Backend verification (HMAC signature check)
   ↓
-Firestore transaction/update
+MongoDB transaction/update (Mongoose session)
   ↓
 Booking confirmed
 ```
 
 Razorpay recommends server-side handling of trusted amounts, signature validation and HMAC validation for webhooks.
 
-Never store Razorpay secret credentials in the React application.
+Never store Razorpay secret credentials in the React application. Secrets live only in backend environment variables.
 
 ---
 
@@ -819,17 +825,17 @@ The exact hold duration should be an admin-configurable business setting.
 
 **Sign up (email/password)**
 
-Fields: full name, email, password, confirm password, terms acceptance. Email verification required.
+Fields: full name, email, password, confirm password, terms acceptance. Password is hashed with bcrypt before storage. Email verification required (verification token emailed on signup, confirmed via backend endpoint).
 
-**Google** — OAuth.
+**Google** — OAuth (via `passport-google-oauth20` or equivalent), linked to the `users` collection via `googleId`.
 
-**Apple** — Sign in with Apple.
+**Apple Sign In** — Deferred to a later phase (see §4, Non-Goals for V1); the `authProvider` field on the user schema (§52) is designed to accommodate it later without a schema migration.
 
 ---
 
 ## 31. Account Linking
 
-If the same verified email exists across authentication providers, the system should support safe account-linking flows where Firebase supports them.
+If the same verified email address is used to sign up via a different provider (e.g. Google after an existing email/password account), the backend should detect the collision by email and link the new provider to the existing `users` document rather than creating a duplicate account.
 
 Avoid duplicate customer profiles.
 
@@ -1087,9 +1093,9 @@ No keyword stuffing.
 
 ---
 
-## 51. Firestore Data Model
+## 51. MongoDB Data Model
 
-Core collections:
+Core collections (each backed by a Mongoose model/schema):
 
 ```
 users
@@ -1115,55 +1121,57 @@ settings
 auditLogs
 ```
 
+Every collection uses MongoDB's native `_id` (ObjectId) as primary key. Foreign references (e.g. `userId`, `tripTemplateId`) are stored as ObjectId references and populated via Mongoose `.populate()` where needed.
+
 ---
 
 ## 52. User Document
 
-`users/{uid}`
+Collection: `users`
 
-Fields: `uid`, `email`, `displayName`, `photoURL`, `role`, `emailVerified`, `status`, `createdAt`, `updatedAt`, `lastLoginAt`
+Fields: `_id`, `email`, `passwordHash`, `displayName`, `photoURL`, `role`, `authProvider` (`local` \| `google`), `googleId`, `emailVerified`, `emailVerificationToken`, `passwordResetToken`, `status`, `createdAt`, `updatedAt`, `lastLoginAt`
 
-Additional traveler information belongs in controlled application data, not Firebase Auth's fixed user object. Firebase documents that additional user properties should be stored in another service such as Firestore.
+`passwordHash` is generated with bcrypt and is never selected/returned by default on any query (`select: false` at the schema level). Traveler-specific information (pickup preferences, saved travelers, etc.) is stored in related documents referencing `userId`, not embedded in the core user record, to keep authentication documents small and stable.
 
 ---
 
 ## 53. Trip Template
 
-`tripTemplates/{tripId}`
+Collection: `tripTemplates`
 
-Fields: `title`, `slug`, `destinationId`, `description`, `durationDays`, `durationNights`, `heroImage`, `gallery`, `basePrice`, `currency`, `status`, `featured`, `itineraryId`, `inclusions`, `exclusions`, `terms`, `createdBy`, `updatedBy`, `createdAt`, `updatedAt`
+Fields: `_id`, `title`, `slug`, `destinationId` (ref `destinations`), `description`, `durationDays`, `durationNights`, `heroImage`, `gallery`, `basePrice`, `currency`, `status`, `featured`, `itineraryId` (ref `itineraries`), `inclusions`, `exclusions`, `terms`, `createdBy` (ref `users`), `updatedBy` (ref `users`), `createdAt`, `updatedAt`
 
 ---
 
 ## 54. Departure
 
-`departures/{departureId}`
+Collection: `departures`
 
-Fields: `tripTemplateId`, `departureDate`, `returnDate`, `capacity`, `reservedSeats`, `confirmedSeats`, `availableSeats`, `price`, `status`, `pickupLocations`, `bookingCutoff`, `createdAt`, `updatedAt`
+Fields: `_id`, `tripTemplateId` (ref `tripTemplates`), `departureDate`, `returnDate`, `capacity`, `reservedSeats`, `confirmedSeats`, `availableSeats`, `price`, `status`, `pickupLocations`, `bookingCutoff`, `createdAt`, `updatedAt`
 
 ---
 
 ## 55. Booking
 
-`bookings/{bookingId}`
+Collection: `bookings`
 
-Fields: `bookingNumber`, `userId`, `tripTemplateId`, `departureId`, `status`, `travelerCount`, `subtotal`, `discount`, `tax`, `total`, `currency`, `paymentStatus`, `razorpayOrderId`, `createdAt`, `updatedAt`
+Fields: `_id`, `bookingNumber`, `userId` (ref `users`), `tripTemplateId` (ref `tripTemplates`), `departureId` (ref `departures`), `status`, `travelerCount`, `subtotal`, `discount`, `tax`, `total`, `currency`, `paymentStatus`, `razorpayOrderId`, `createdAt`, `updatedAt`
 
 ---
 
 ## 56. Private Trip Request
 
-`privateTripRequests/{requestId}`
+Collection: `privateTripRequests`
 
-Fields: `userId`, `destinationId`, `travelStartDate`, `travelEndDate`, `travelerCount`, `pickupLocation`, `hotelPreference`, `transportPreference`, `activityPreferences`, `foodPreferences`, `budget`, `specialRequirements`, `status`, `createdAt`, `updatedAt`
+Fields: `_id`, `userId` (ref `users`), `destinationId` (ref `destinations`), `travelStartDate`, `travelEndDate`, `travelerCount`, `pickupLocation`, `hotelPreference`, `transportPreference`, `activityPreferences`, `foodPreferences`, `budget`, `specialRequirements`, `status`, `createdAt`, `updatedAt`
 
 ---
 
 ## 57. Private Proposal
 
-`privateTripProposals/{proposalId}`
+Collection: `privateTripProposals`
 
-Fields: `requestId`, `version`, `itinerary`, `services`, `subtotal`, `markup`, `tax`, `discount`, `total`, `currency`, `validUntil`, `status`, `createdBy`, `createdAt`, `updatedAt`
+Fields: `_id`, `requestId` (ref `privateTripRequests`), `version`, `itinerary`, `services`, `subtotal`, `markup`, `tax`, `discount`, `total`, `currency`, `validUntil`, `status`, `createdBy` (ref `users`), `createdAt`, `updatedAt`
 
 Proposal versioning is mandatory. If an admin changes the proposal, a new version should be created rather than destroying the historical record.
 
@@ -1171,9 +1179,9 @@ Proposal versioning is mandatory. If an admin changes the proposal, a new versio
 
 ## 58. Payment
 
-`payments/{paymentId}`
+Collection: `payments`
 
-Fields: `bookingId`, `userId`, `razorpayOrderId`, `razorpayPaymentId`, `amount`, `currency`, `status`, `method`, `signatureVerified`, `capturedAt`, `createdAt`, `updatedAt`
+Fields: `_id`, `bookingId` (ref `bookings`), `userId` (ref `users`), `razorpayOrderId`, `razorpayPaymentId`, `amount`, `currency`, `status`, `method`, `signatureVerified`, `capturedAt`, `createdAt`, `updatedAt`
 
 ---
 
@@ -1181,9 +1189,9 @@ Fields: `bookingId`, `userId`, `razorpayOrderId`, `razorpayPaymentId`, `amount`,
 
 Every sensitive administrative action should be auditable.
 
-`auditLogs/{logId}`
+Collection: `auditLogs`
 
-Fields: `actorId`, `actorRole`, `action`, `entityType`, `entityId`, `before`, `after`, `timestamp`, `ipMetadata`
+Fields: `_id`, `actorId` (ref `users`), `actorRole`, `action`, `entityType`, `entityId`, `before`, `after`, `timestamp`, `ipMetadata`
 
 Avoid storing unnecessary sensitive information.
 
@@ -1213,7 +1221,7 @@ Do not implement authorization only through hidden UI buttons. Authorization mus
 
 ## 61. Security
 
-Mandatory controls: Firebase Auth, Firestore Security Rules, Storage Security Rules, App Check where appropriate, server-side authorization, server-side payment verification, secret management, rate limiting for sensitive functions, input validation, output sanitization, audit logging, least privilege, secure cookies/session handling where applicable, HTTPS everywhere.
+Mandatory controls: JWT-based authentication, role-based backend authorization on every admin route, bcrypt password hashing, server-side payment verification, secret management via environment variables, rate limiting for sensitive endpoints (`express-rate-limit`), input validation (Zod) on every write endpoint, output sanitization, audit logging, least privilege, secure httpOnly cookies for session tokens, HTTPS everywhere (enforced via reverse proxy/load balancer in production).
 
 ---
 
@@ -1234,13 +1242,15 @@ Backend:  Confirm booking.
 
 ---
 
-## 63. Firestore Security Model
+## 63. Backend Access Control Model
 
-Public anonymous users should only access explicitly public documents, e.g. published destinations, trips, blog posts (READ).
+There is no client-side database, so there is no equivalent of Firestore Security Rules — every access rule is enforced by Express middleware and route handlers before any MongoDB query runs.
 
-**Customers:** own profile (READ/WRITE per policy), own bookings (READ), own payments (READ), own private requests (READ/WRITE per workflow).
+Public/anonymous requests should only reach endpoints that return explicitly public data, e.g. published destinations, trips, blog posts (`GET`/read-only).
 
-**Admin:** access determined by role and backend authorization.
+**Customers (authenticated, `role: customer`):** own profile (read/update via authenticated middleware scoping queries to `req.user._id`), own bookings (read-only), own payments (read-only), own private requests (read/write per workflow, scoped to `userId`).
+
+**Admin (authenticated, role in `SUPER_ADMIN`/`ADMIN`/`OPERATIONS`/`CONTENT`/`FINANCE`/`SUPPORT`):** access determined by a role-permission map checked in an authorization middleware (see §60) on every admin route; never inferred from the frontend alone.
 
 ---
 
@@ -1331,7 +1341,7 @@ But coupons should not be unnecessarily complex in initial launch.
 - **Retry** — where appropriate.
 - **Network failure** — graceful recovery.
 
-Never expose raw Firebase/Razorpay/server errors to customers.
+Never expose raw Mongoose/Razorpay/server stack traces or internal error messages to customers — map them to human-readable messages at the API boundary.
 
 ---
 
@@ -1497,7 +1507,7 @@ Core public pages should remain fast even on mid-range mobile devices and slower
 
 ## 85. Image Strategy
 
-Use: responsive images, WebP/AVIF where appropriate, proper compression, lazy loading, CDN delivery through Firebase-compatible infrastructure.
+Use: responsive images, WebP/AVIF where appropriate, proper compression, lazy loading, CDN delivery in front of the object storage/backend used for uploaded media (see §11).
 
 Hero images must not unnecessarily block first meaningful rendering.
 
@@ -1567,15 +1577,15 @@ Never develop directly against production data.
 
 ---
 
-## 93. Firebase Project Strategy
+## 93. Database Environment Strategy
 
-Prefer separate Firebase projects/configurations:
+Prefer separate MongoDB databases/clusters per environment:
 
 - `safarup-dev`
 - `safarup-staging`
 - `safarup-production`
 
-This prevents development data from contaminating production.
+Each environment gets its own connection string (`MONGODB_URI`) supplied via environment variables, never hardcoded. This prevents development data from contaminating production.
 
 ---
 
@@ -1624,7 +1634,7 @@ Pull requests should require build, type check, lint, and tests before merge.
 
 **Unit** — pricing, availability, cancellation, discount, state transitions.
 
-**Integration** — Firebase, Razorpay, email, Cloud Functions.
+**Integration** — MongoDB (Mongoose models/queries), Razorpay, email delivery, scheduled jobs (node-cron).
 
 **E2E (group trip)** — Browse → Select → Login → Book → Pay → Confirm
 
@@ -1638,7 +1648,7 @@ Pull requests should require build, type check, lint, and tests before merge.
 
 **Booking:** last seat, multiple simultaneous bookings, expired payment, cancellation, duplicate submission.
 
-**Authentication:** email signup, email verification, Google login, Apple login, existing account, password reset, provider account linking.
+**Authentication:** email signup, email verification, Google login, existing account, password reset, provider account linking. (Apple login test cases apply once Apple Sign In ships — see §30.)
 
 ---
 
@@ -1897,7 +1907,7 @@ review_submitted
 
 ## 124. Performance Observability
 
-Monitor: Core Web Vitals, function latency, Firestore errors, payment failures, checkout conversion, API errors.
+Monitor: Core Web Vitals, API/route latency, MongoDB query errors, payment failures, checkout conversion, API errors.
 
 ---
 
@@ -1956,7 +1966,7 @@ Public URLs must be readable, e.g.:
 /blog/best-places-to-visit-in-bihar
 ```
 
-Avoid exposing raw Firestore IDs in public URLs.
+Avoid exposing raw MongoDB ObjectIds in public URLs.
 
 ---
 
@@ -1986,7 +1996,7 @@ Protect: login-related endpoints, private-trip requests, contact forms, booking 
 
 ## 135. Bot Protection
 
-Consider: Firebase App Check, reCAPTCHA where necessary, honeypots for public forms, rate limits.
+Consider: reCAPTCHA where necessary, honeypots for public forms, `express-rate-limit` on sensitive endpoints.
 
 ---
 
@@ -2122,7 +2132,7 @@ Before launch:
 
 **Backend**
 - [ ] Security rules
-- [ ] Functions
+- [ ] Route/middleware layer
 - [ ] Webhooks
 - [ ] Idempotency
 - [ ] Logging
@@ -2131,7 +2141,6 @@ Before launch:
 **Authentication**
 - [ ] Email/password
 - [ ] Google
-- [ ] Apple
 - [ ] Email verification
 - [ ] Password recovery
 
@@ -2168,7 +2177,7 @@ Before launch:
 ## 149. Development Phases
 
 **Phase 0 — Product foundation**
-Repository, monorepo, Firebase projects, environments, CI/CD, design tokens, authentication architecture, security baseline.
+Repository, monorepo (`backend`, `public`, `admin`), MongoDB environments, CI/CD, design tokens, authentication architecture, security baseline.
 
 **Phase 1 — Public foundation**
 Homepage, header, footer, destinations, destination details, trips, trip details, about, contact, policies.
@@ -2177,7 +2186,7 @@ Homepage, header, footer, destinations, destination details, trips, trip details
 Admin authentication, roles, dashboard, destination CMS, trip CMS, itinerary builder, departure management.
 
 **Phase 3 — Customer accounts**
-Signup, login, Google, Apple, profile, dashboard, bookings.
+Signup, login, Google, profile, dashboard, bookings. (Apple Sign In deferred — see §30.)
 
 **Phase 4 — Booking engine**
 Traveler details, availability, seat reservation, booking state machine, booking confirmation.
@@ -2354,24 +2363,26 @@ For the new SafarUp, these decisions are now the baseline:
 | WhatsApp booking dependency | No |
 | QR screenshot payment | No |
 | Payment gateway | Razorpay |
-| Public application | React + TypeScript + Vite |
-| Backend | Firebase |
-| Database | Firestore |
-| Authentication | Firebase Auth |
+| Language | JavaScript (no TypeScript) across all three apps |
+| Public application | React + Vite (JavaScript) |
+| Admin application | React + Vite (JavaScript) |
+| Backend | Node.js + Express (JavaScript) |
+| Database | MongoDB (Mongoose) |
+| Authentication | Custom (JWT + bcrypt), backend-issued sessions |
 | Email/password | Yes |
 | Google | Yes |
-| Apple | Yes |
+| Apple | Deferred to a later phase |
 | Phone OTP | No |
-| Storage | Firebase Storage |
-| Server logic | Firebase Cloud Functions |
+| Storage | Backend-managed uploads (local/S3-compatible) |
+| Server logic | Express routes/controllers/middleware |
 | Public domain | safarup.in |
 | Admin domain | admin.safarup.in |
-| Repository structure | web + admin + backend |
+| Repository structure | public + admin + backend |
 | Public mobile UX | App-like / floating bottom navigation |
 | Desktop UX | Premium full web experience |
 | Admin UX | Desktop-first operations control center |
 | Core commercial object | Trip / Departure / Booking |
 | Private-trip workflow | Request → Proposal → Acceptance → Payment → Booking |
 | Payment verification | Server-side |
-| Booking capacity | Transaction-safe |
+| Booking capacity | Transaction-safe (MongoDB transactions/sessions) |
 | Admin | Operational source of truth |
