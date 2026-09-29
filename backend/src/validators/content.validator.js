@@ -49,7 +49,46 @@ const districtBody = z.object({
   status: contentStatus.optional(),
 });
 
-const districtPatch = districtBody.partial().refine((data) => Object.keys(data).length > 0, {
+// ---------------------------------------------------------------------------
+// Patch schemas — `slug` is deliberately NOT patchable
+// ---------------------------------------------------------------------------
+
+const SLUG_IMMUTABLE_MESSAGE =
+  'Slug cannot be changed after creation (PRD §200.8 — slug-mutation policy is unapproved)';
+
+/**
+ * PATCH schemas deliberately make `slug` unpatchable.
+ *
+ * A slug is claimed atomically at create time (`createWithSlug` → `claimSlug`),
+ * and every public read resolves a slug by reading that `slugClaims` document
+ * (`findPublishedBySlug` → `resolveSlug`). A PATCH that merged a new `slug`
+ * into the entity without touching the claim would cause two failures:
+ *
+ *   1. The old claim stays behind permanently, so that slug can never be
+ *      reused by anything, ever.
+ *   2. The new slug is never claimed, so `findPublishedBySlug` returns null and
+ *      the entity loses its canonical URL — an unannounced 404 for a page that
+ *      is still live, published, and linked from the sitemap.
+ *
+ * A CONTENT-role user could trigger this through an ordinary PATCH, which is
+ * why the field is rejected in the schema rather than merely documented.
+ *
+ * `z.never()` rejects any supplied value while still permitting the field to be
+ * absent, so the request fails as a 400 naming `slug` instead of being silently
+ * stripped and reported as an unrelated "empty body" error.
+ *
+ * The *policy* for slug mutation — redirect, slug retention, which role may
+ * perform it — is an open decision under PRD §200.8, so it is deliberately not
+ * invented here. Once approved, slug mutation must be implemented as a single
+ * transaction that claims the new slug and releases the old one via
+ * `releaseSlug`, never as a bare merge.
+ */
+const withoutSlug = (bodySchema) =>
+  bodySchema
+    .extend({ slug: z.never({ invalid_type_error: SLUG_IMMUTABLE_MESSAGE }) })
+    .partial();
+
+const districtPatch = withoutSlug(districtBody).partial().refine((data) => Object.keys(data).length > 0, {
   message: 'At least one field must be provided',
 });
 
@@ -65,7 +104,7 @@ const categoryBody = z.object({
   sortOrder: z.number().int().min(0).max(9999).nullable().optional(),
 });
 
-const categoryPatch = categoryBody.partial().refine((data) => Object.keys(data).length > 0, {
+const categoryPatch = withoutSlug(categoryBody).partial().refine((data) => Object.keys(data).length > 0, {
   message: 'At least one field must be provided',
 });
 
@@ -88,7 +127,7 @@ const placeBody = z.object({
   canonicalUrl: httpUrl.nullable().optional(),
 });
 
-const placePatch = placeBody.partial().refine((data) => Object.keys(data).length > 0, {
+const placePatch = withoutSlug(placeBody).partial().refine((data) => Object.keys(data).length > 0, {
   message: 'At least one field must be provided',
 });
 
@@ -123,7 +162,7 @@ const destinationBody = z.object({
   // schema.
 });
 
-const destinationPatch = destinationBody.partial().refine((data) => Object.keys(data).length > 0, {
+const destinationPatch = withoutSlug(destinationBody).partial().refine((data) => Object.keys(data).length > 0, {
   message: 'At least one field must be provided',
 });
 

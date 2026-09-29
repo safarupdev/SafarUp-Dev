@@ -125,11 +125,34 @@ async function createWithSlug({ collection, slug, document }) {
 }
 
 /**
+ * Refuses a patch that attempts to change `slug`.
+ *
+ * Validation already omits `slug` from every PATCH schema, so this is
+ * defence in depth: it makes the invariant impossible to violate from any
+ * future call site, rather than dependent on every controller remembering the
+ * rule. The throw is a 400 — a client mistake, not a server fault.
+ *
+ * When the slug-mutation policy (PRD §200.8) is approved, this guard is
+ * replaced by a single transaction that calls `claimSlug` for the new value
+ * and `releaseSlug` for the old one. Until then there is no supported way to
+ * change a slug, so the safest available answer is to reject it.
+ */
+function assertSlugUnchanged(patch) {
+  if (patch && Object.prototype.hasOwnProperty.call(patch, 'slug')) {
+    const err = new Error('Slug cannot be changed through a patch');
+    err.statusCode = 400;
+    err.code = 'SLUG_IMMUTABLE';
+    throw err;
+  }
+}
+
+/**
  * Applies a partial patch and stamps `updatedAt`.
  *
  * Merge semantics: unspecified fields are preserved.
  */
 async function patchById(collection, id, patch) {
+  assertSlugUnchanged(patch);
   const db = getFirestore();
   await db
     .collection(collection)
@@ -142,6 +165,7 @@ async function patchById(collection, id, patch) {
  * change can never be recorded without its audit trail (PRD §77).
  */
 async function patchWithAudit({ collection, id, patch, entityType, action, actorId, actorRole, before, after }) {
+  assertSlugUnchanged(patch);
   const db = getFirestore();
   const batch = db.batch();
   batch.set(db.collection(collection).doc(id), { ...patch, updatedAt: new Date() }, { merge: true });
@@ -216,6 +240,37 @@ async function resolveMany(collection, ids) {
   return results;
 }
 
+/**
+ * Resolves many entity IDs to PUBLISHED entities only, in one batched read.
+ *
+ * `resolveMany` above is deliberately unfiltered because the Admin CMS must be
+ * able to resolve a reference to a DRAFT or ARCHIVED entity. The public read
+ * paths must not: an ARCHIVED Place referenced by a published Destination was
+ * resolved by name and slug into the public payload and into
+ * `includesAttraction` JSON-LD, disclosing content that was deliberately
+ * withdrawn.
+ *
+ * The status filter is applied here, in the data-access layer, so every public
+ * caller is protected by construction rather than by remembering to filter.
+ * It is applied in JavaScript rather than as a Firestore `where` clause
+ * deliberately: `__name__ IN` is served by the built-in `__name__` index
+ * alone, whereas adding a second equality filter alongside it would make the
+ * query depend on a composite index that cannot be verified outside a real
+ * Firestore project. The read is already bounded to 30 IDs per chunk, so the
+ * filter costs nothing measurable.
+ *
+ * Unresolved IDs are simply absent from the map, which is what every public
+ * caller already handles for a missing reference.
+ */
+async function resolvePublishedMany(collection, ids) {
+  const resolved = await resolveMany(collection, ids);
+  const published = new Map();
+  for (const [id, entity] of resolved) {
+    if (entity && entity.status === 'PUBLISHED') published.set(id, entity);
+  }
+  return published;
+}
+
 module.exports = {
   CONTENT_STATUSES,
   DEFAULT_LIMIT,
@@ -235,6 +290,7 @@ module.exports = {
   findBySlug,
   findById,
   resolveMany,
+  resolvePublishedMany,
   claimSlug,
   releaseSlug,
 };

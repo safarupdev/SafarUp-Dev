@@ -20,6 +20,7 @@ const {
   patchById,
   patchWithAudit,
   resolveMany,
+  resolvePublishedMany,
   toEntity,
   clampLimit,
   encodeCursor,
@@ -67,6 +68,11 @@ async function get(id) {
 
 async function getMany(ids) {
   return resolveMany(COLLECTION, ids);
+}
+
+/** PUBLIC read path only — see `place.repository.js getManyPublished`. */
+async function getManyPublished(ids) {
+  return resolvePublishedMany(COLLECTION, ids);
 }
 
 /**
@@ -144,6 +150,7 @@ module.exports = {
   create,
   get,
   getMany,
+  getManyPublished,
   findPublished,
   findOneBySlug,
   list,

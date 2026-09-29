@@ -26,6 +26,7 @@ const {
   patchById,
   patchWithAudit,
   resolveMany,
+  resolvePublishedMany,
   toEntity,
   clampLimit,
   encodeCursor,
@@ -151,24 +152,35 @@ async function findOneBySlug(slug) {
  * (one per collection) rather than N reads — the no-N+1 requirement of
  * FIRESTORE.destination.contract.md §5.
  */
-async function resolveRelations(destination) {
+async function resolveRelations(destination, { publishedOnly = false } = {}) {
   if (!destination) return null;
+
+  // `publishedOnly` is required by every PUBLIC caller. Admin callers must
+  // resolve DRAFT/ARCHIVED references in order to edit them, so the default is
+  // the permissive behaviour and each public path must opt in explicitly.
+  const resolveRefs = publishedOnly ? resolvePublishedMany : resolveMany;
 
   const [district, categories, places] = await Promise.all([
     destination.districtId
       ? getFirestore().collection('districts').doc(destination.districtId).get()
       : Promise.resolve(null),
     (destination.categoryIds || []).length
-      ? resolveMany('categories', destination.categoryIds)
+      ? resolveRefs('categories', destination.categoryIds)
       : Promise.resolve(new Map()),
     (destination.placeIds || []).length
-      ? resolveMany('places', destination.placeIds)
+      ? resolveRefs('places', destination.placeIds)
       : Promise.resolve(new Map()),
   ]);
 
+  // A District is a single point read, so it cannot use the batched helper.
+  // The status check mirrors `resolvePublishedMany` exactly.
+  const districtEntity = district && district.exists ? district.data() : null;
+  const districtIsVisible = districtEntity
+    && (!publishedOnly || districtEntity.status === 'PUBLISHED');
+
   return {
-    district: district && district.exists
-      ? { id: district.id, slug: district.data().slug, name: district.data().name }
+    district: districtIsVisible
+      ? { id: district.id, slug: districtEntity.slug, name: districtEntity.name }
       : null,
     categories: (destination.categoryIds || [])
       .map((id) => categories.get(id))

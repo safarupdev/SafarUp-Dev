@@ -35,10 +35,15 @@ async function resolveBatchReferences(destinations) {
   }
 
   // Three reads, regardless of how many destinations are on the page.
+  //
+  // Published-only: this module backs PUBLIC list and detail responses, so an
+  // ARCHIVED/DRAFT District, Category or Place referenced by a published
+  // Destination must not be resolved into the payload. `getManyPublished`
+  // enforces that in the data-access layer.
   const [districts, categories, places] = await Promise.all([
-    districtRepository.getMany([...districtIds]),
-    categoryRepository.getMany([...categoryIds]),
-    placeRepository.getMany([...placeIds]),
+    districtRepository.getManyPublished([...districtIds]),
+    categoryRepository.getManyPublished([...categoryIds]),
+    placeRepository.getManyPublished([...placeIds]),
   ]);
 
   return list.map((destination) => ({
