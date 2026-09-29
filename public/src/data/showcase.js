@@ -96,7 +96,22 @@ export const SHOWCASE_TRIPS = [
     destinationSlug: null,
     district: 'Jamui',
     duration: '2 Days / 1 Night',
+    /**
+     * The journey-first shape (PRD open decision: Trip Detail field contract).
+     * A Trip is a COMPLETE journey, not a destination. `route` is the
+     * ordered spine the UI visualises; `role` drives the marker treatment
+     * and must be 'start' | 'stop' | 'overnight' | 'return'. Derived from
+     * the day's own start/end locations below, so route and itinerary can
+     * never disagree.
+     */
+    nights: 1,
+    route: [
+      { name: 'Jamui', role: 'start' },
+      { name: 'Simultala', role: 'overnight' },
+      { name: 'Jamui', role: 'return' },
+    ],
     season: 'October – February',
+    seasonShort: 'Oct – Feb',
     groupSize: 'Small group',
     tripType: 'Heritage & Nature',
     summary:
@@ -230,7 +245,14 @@ export const SHOWCASE_TRIPS = [
     destinationName: 'Bodh Gaya',
     district: 'Gaya',
     duration: '2 Days / 1 Night',
+    nights: 1,
+    route: [
+      { name: 'Gaya', role: 'start' },
+      { name: 'Bodh Gaya', role: 'overnight' },
+      { name: 'Gaya', role: 'return' },
+    ],
     season: 'October – March',
+    seasonShort: 'Oct – Mar',
     groupSize: 'Small group',
     tripType: 'Spiritual & Cultural',
     summary:
@@ -343,7 +365,14 @@ export const SHOWCASE_TRIPS = [
     destinationName: 'Nalanda',
     district: 'Nalanda',
     duration: '3 Days / 2 Nights',
+    nights: 2,
+    route: [
+      { name: 'Rajgir', role: 'start' },
+      { name: 'Nalanda', role: 'overnight' },
+      { name: 'Rajgir', role: 'return' },
+    ],
     season: 'September – March',
+    seasonShort: 'Sep – Mar',
     groupSize: 'Small group',
     tripType: 'Heritage',
     summary:
@@ -481,3 +510,131 @@ export const CATEGORY_ORDER = [
   'Hills & Nature',
   'Wildlife & Seasonal',
 ];
+
+/* ==========================================================================
+   JOURNEY-FIRST PRESENTATION HELPERS
+   --------------------------------------------------------------------------
+   A SafarUp Trip is the product. It is a complete, multi-day journey across
+   several locations and many places, with an overnight stay and a return.
+
+   These helpers derive the journey view-model from the trip record. They are
+   deliberately DERIVED rather than duplicated: a second hand-written copy of
+   the route, the clusters or the facts would drift from `itinerary`, and a
+   journey whose route disagrees with its own day-by-day plan is worse than no
+   route at all.
+
+   No live inventory is implied anywhere here: no price, departure date, seat
+   count or availability is derived. `IS_SHOWCASE` stays the single switch.
+   ========================================================================== */
+
+/** `Jamui - Simultala - Jamui` — the route as one line of text. */
+export function tripRouteSummary(trip) {
+  if (!trip?.route?.length) return trip?.district ?? '';
+  return trip.route.map((leg) => leg.name).join(' - ');
+}
+
+/**
+ * Spoken form of the route, for an `aria-label`. The visual markers are
+ * decorative, so this is the only thing a screen reader gets — it has to
+ * carry start, overnight and return explicitly.
+ */
+export function tripRouteDescription(trip) {
+  if (!trip?.route?.length) return '';
+  const parts = trip.route.map((leg) => {
+    if (leg.role === 'start') return `starting at ${leg.name}`;
+    if (leg.role === 'overnight') return `overnight at ${leg.name}`;
+    if (leg.role === 'return') return `then returning to ${leg.name}`;
+    return `then ${leg.name}`;
+  });
+  return `Route: ${parts.join(', ')}.`;
+}
+
+/**
+ * Group a journey's stops by the location they belong to, preserving the
+ * order the route introduces them in.
+ *
+ * Ownership comes from the day, not from a name match on the stop: a stop is
+ * attributed to the location that is current when it is reached. That is what
+ * makes "Jamui - 4 places / Simultala - 3 places" truthful, and it means a
+ * place visited on two days is listed once per location rather than duplicated.
+ */
+export function tripLocationClusters(trip) {
+  if (!trip?.itinerary?.length) return [];
+
+  const order = [];
+  const byLocation = new Map();
+
+  /**
+   * The journey's own waypoints, by name.
+   *
+   * The last stop recorded on a day is the hand-off to the next location (or
+   * the return), not a place visited there. Counting it as a place made
+   * Day 1 of the Jamui journey report "Simultala" as a Jamui place and
+   * overstate the total, and it also double-counted the boundary in a
+   * three-day journey where both days pass through Nalanda.
+   *
+   * Every waypoint is already shown by `RouteLine`, so attributing it to a
+   * cluster as well would make the journey look like it has more distinct
+   * stops than it actually does.
+   */
+  const waypoints = new Set((trip.route ?? []).map((leg) => leg.name));
+
+  for (const day of trip.itinerary) {
+    // A day belongs to the location it departs from. The location it ends at
+    // is where the next day takes over, and is attributed by that day.
+    const location = day.startLocation;
+    if (!location) continue;
+
+    if (!byLocation.has(location)) {
+      byLocation.set(location, { location, places: [], days: [] });
+      order.push(location);
+    }
+    const cluster = byLocation.get(location);
+    cluster.days.push(day.day);
+
+    for (const stop of day.stops ?? []) {
+      if (waypoints.has(stop.name)) continue;
+      if (cluster.places.some((place) => place.name === stop.name)) continue;
+      cluster.places.push({ name: stop.name, description: stop.description });
+    }
+  }
+
+  return order.map((location) => {
+    const cluster = byLocation.get(location);
+    return {
+      location,
+      places: cluster.places,
+      placeNames: cluster.places.map((place) => place.name),
+      placeCount: cluster.places.length,
+      days: cluster.days,
+    };
+  });
+}
+
+/** Total distinct places across the whole journey. */
+export function tripPlaceCount(trip) {
+  return tripLocationClusters(trip).reduce((total, cluster) => total + cluster.placeCount, 0);
+}
+
+/**
+ * The quick-facts strip. Values are derived, never hand-typed, so a journey
+ * cannot advertise a duration its own itinerary contradicts.
+ */
+export function tripFacts(trip) {
+  if (!trip) return [];
+  const facts = [
+    { key: 'duration', label: 'Duration', value: trip.duration },
+    { key: 'route', label: 'Route', value: tripRouteSummary(trip) },
+    { key: 'places', label: 'Places', value: `${tripPlaceCount(trip)} places` },
+    { key: 'season', label: 'Season', value: trip.season },
+    { key: 'group', label: 'Group size', value: trip.groupSize },
+  ];
+  if (trip.nights != null) {
+    facts.splice(1, 0, {
+      key: 'nights',
+      label: 'Nights',
+      value: trip.nights === 0 ? 'No overnight' : `${trip.nights} night${trip.nights === 1 ? '' : 's'}`,
+    });
+  }
+  return facts;
+}
