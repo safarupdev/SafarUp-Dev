@@ -3,10 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sakala</title>
+
+    <!--
+      Baseline head. Per-route title, description, canonical, Open Graph and
+      JSON-LD are applied by the route itself (src/lib/seo.js) — a crawler that
+      does not run JavaScript sees these defaults.
+    -->
+    <title>SafarUp — Travel. Planned Better.</title>
+    <meta
+      name="description"
+      content="SafarUp plans curated group trips and private, fully-customised journeys across India — transparent booking, secure payment, and trip management from booking to departure."
+    />
+    <meta name="theme-color" content="#0a1120" />
+    <meta property="og:site_name" content="SafarUp" />
+    <meta property="og:type" content="website" />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="padding: 2rem; font-family: system-ui, sans-serif">
+        <h1>SafarUp</h1>
+        <p>
+          SafarUp needs JavaScript to show destinations. If you have JavaScript turned off, please
+          email us and we will send you the information directly.
+        </p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

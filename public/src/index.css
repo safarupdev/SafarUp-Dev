@@ -1,8 +1,87 @@
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * DESIGN_SYSTEM.md §7: focus must be visible and keyboard-reachable.
+ * One ring, defined once, so it cannot drift between components.
+ * `outline` rather than `box-shadow` so it survives forced-colours mode.
+ */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-white text-navy-900 antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme('colors.brand.600');
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Never let a media query or filter surface take focus styling away. */
+  [tabindex='-1']:focus {
+    outline: none;
+  }
+
+  /*
+   * DESIGN_SYSTEM.md §8: `prefers-reduced-motion` is implemented, not merely
+   * intended. Animations are communication only, so removing them costs no
+   * content and no discoverability — a crawler and a reduced-motion user see
+   * exactly the same DOM.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
-.app {
-  padding: 2rem;
+@layer components {
+  /* Readable measure for long-form travel copy (DESIGN_SYSTEM.md §4). */
+  .measure {
+    max-width: theme('maxWidth.prose');
+  }
+
+  /*
+   * Bottom-nav offset for page content. Reserved unconditionally on mobile so
+   * the last card is never trapped under the fixed bar, and so the sticky
+   * action bar above it has somewhere to sit (§195.2).
+   */
+  .pb-safe-nav {
+    padding-bottom: calc(theme('spacing.bottom-nav') + env(safe-area-inset-bottom, 0px) + 1.5rem);
+  }
+
+  @media (min-width: 768px) {
+    .pb-safe-nav {
+      padding-bottom: 4rem;
+    }
+  }
+
+  /* Skeleton base. DESIGN_SYSTEM.md §10: skeletons, not spinners. */
+  .skeleton {
+    @apply relative overflow-hidden bg-navy-100;
+  }
+
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/60 to-transparent;
+  }
 }
