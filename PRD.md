@@ -6,14 +6,22 @@
 | **Domain** | safarup.in |
 | **Admin** | admin.safarup.in |
 | **Document** | Master Product Requirements Document |
-| **Version** | 1.1 |
-| **Status** | Production Development Baseline |
+| **Version** | 1.5 |
+| **Status** | Proposed |
 | **Date** | September 2026 |
 | **Product Type** | Digital Travel Company + Travel Commerce Platform |
 | **Primary Market** | India, initially Bihar-focused |
 | **Primary Currency** | INR (₹) |
 
-> **v1.1 changelog:** Replaced the Firebase/TypeScript stack (Firestore, Firebase Auth, Cloud Functions, Firebase Storage) with a JavaScript-only stack: React + Vite for `public`/`admin`, Node.js + Express + MongoDB (Mongoose) for `backend`, custom JWT/bcrypt authentication (Google OAuth supported, Apple Sign In deferred). This aligns the PRD with the actual repository scaffold. All data models in §51–59 are unchanged in shape, now expressed as MongoDB collections instead of Firestore documents.
+> **v1.5 changelog:** Phase 1 domain decisions and the repository design workflow. **Records four APPROVED decisions** — (a) **Guide** is an internal operational entity for V1 (admin management and trip/departure assignment allowed; public guide marketplace, discovery experience and separate portal remain V1 non-goals per §4); (b) **Category** is a first-class taxonomy entity and **Destination → Category is MANY-TO-MANY via `categoryIds[]`**, not a singular `categoryId` and not an uncontrolled free-text string; (c) **District** is a first-class canonical geographic entity and **Destination → District is 1:1 via `districtId`**, superseding the interim "store `region` as a plain string" proposal; (d) **Place / Attraction** is a **first-class canonical entity** for Phase 2 content foundation, reusable across Destination, Trip itineraries, Places Covered, maps, search, SEO/AEO/GEO and agent resources, and **never duplicated** into destination or trip documents. Establishes the **contract-first, repository-persisted contract system** (`docs/CONTRACTS/`, lifecycle `DRAFT → REVIEW → APPROVED → IMPLEMENTED`) so that contracts are project architecture rather than conversation artifacts. **Supersedes the Figma-based design-to-code workflow**: the visual source of truth is now **OpenCode + `docs/DESIGN_SYSTEM.md` + browser/screenshot visual review** (§178 replaced). Retains the four permanent Masters (§159), structured Trip Detail architecture (§185–§199) and the agent-native product direction (§162–§166). Persists the destination/domain/API/Firestore contracts for the Phase 2 Destination content foundation. Historical changelog entries are retained.
+>
+> **v1.4 changelog:** Structured Trip Detail / Group Booking content architecture. Adds §185–§200: the canonical Trip Detail content model (§185 trip identity, overview, pickup/drop, day-wise itinerary; §186 places covered; §187 historical/cultural context; §188 inclusions/exclusions; §189 vehicle; §190 accommodation; §191 food/meals; §192 seasonality; §193 important information; §194 booking summary), desktop and mobile Trip Detail composition (§195), Trip Detail SEO/AEO/GEO (§196), the agent-native Trip interface (§197), the group-booking model separation (§198), Trip content-management requirements for the admin CMS (§199), and **§200 Domain Decisions Required** — which records the newly identified `places`/attraction entity gap alongside the existing Guide, Category and District items. Amends §20, §40, §53, §51.1, §182 and §178 to point at the new sections without duplicating them. No business rule is invented where the source material is silent; unresolved items are listed in §200 rather than assumed.
+>
+> **v1.3 changelog:** Product architecture evolution. Establishes SafarUp as a *human-first, search-discoverable, AI-understandable, agent-operable, automation-ready* platform, and adds §157–§184: the multi-agent development model (§158), the four permanent quality masters (§159), parallel-development governance (§160), contract-first development (§161), human/agent capability parity (§162), the agent-native platform and its safety model (§163–§166), the premium responsive + design-system standard (§167–§171), the SEO/AEO/GEO architecture (§172–§174), vertical slices and quality gates (§175–§177), design-to-code workflow (§178), retention principles (§179), booking/automation evolution (§180), domain-model governance (§181), the revised phase model (§182), the agent-friendly Definition of Done (§183), and the core principle (§184). Also amends §1 (vision), §7/§9 (architecture), §10/§51 (database), §32 (mobile navigation), §34 (design system) and §151 (Definition of Done). §181 flags **Guide**, **Category** and **District** as requiring explicit product reconciliation before implementation — see §51.1.
+>
+> **v1.2 changelog:** Restored Firebase Firestore as the primary database, accessed server-side through the `firebase-admin` Node SDK (commit `ac402fb`). This reverses the v1.1 database change: the JavaScript-only application stack (React + Vite for `public`/`admin`, Node.js + Express for `backend`, custom JWT/bcrypt authentication) is unchanged and remains in force. What changed is the persistence layer only — data access goes through Firestore data-access modules in `backend/src/models/*.model.js` instead of Mongoose schemas. All data models in §51–59 are unchanged in shape. See §1.1 changelog for the v1.1 history.
+>
+> **v1.1 changelog:** Replaced the Firebase/TypeScript stack (Firebase Auth, Cloud Functions, Firebase Storage) with a JavaScript-only stack: React + Vite for `public`/`admin`, Node.js + Express for `backend`, custom JWT/bcrypt authentication (Google OAuth supported, Apple Sign In deferred). All data models in §51–59 are unchanged in shape.
 
 ---
 
@@ -22,6 +30,8 @@
 ### 1.1 Product Vision
 
 SafarUp is a digital-first travel company designed to make organized travel discoverable, customizable, bookable and manageable online.
+
+SafarUp shall be designed for both human travelers and authorized AI-agent interaction, with a **shared canonical platform layer**. The business logic, authorization model, domain services, availability rules, booking rules and payment rules remain centralized; user interfaces, AI agents and automation systems are all clients of the same capabilities (§157, §162). See §184.
 
 SafarUp will provide two primary travel products:
 
@@ -102,7 +112,7 @@ safarup.in                    admin.safarup.in
                   │
    ┌──────────────┼──────────────┐
    ▼               ▼              ▼
-MongoDB         Razorpay        Email
+ Firestore        Razorpay        Email
 ```
 
 ---
@@ -268,9 +278,20 @@ safarup/
 
 - **public/** — Customer-facing SafarUp application (React, JavaScript, Vite).
 - **admin/** — Internal operations application (React, JavaScript, Vite).
-- **backend/** — Shared trusted backend/business logic (Node.js, Express, MongoDB).
+- **backend/** — Shared trusted backend/business logic (Node.js, Express, Firestore).
 
 > Naming note: this repository uses `public/` for the customer-facing app (matching the existing scaffold) instead of `web/`. All references to "web" elsewhere in this document refer to this `public/` application.
+
+### 7.2 Canonical platform layer
+
+The backend is the **canonical** implementation of every business capability. `public/`, `admin/`, future mobile applications, AI agents and automation systems are all clients of it (§157, §162).
+
+Consequences, which are binding on all implementation agents (§160, §166):
+
+- Business rules are implemented **once**, in backend services.
+- An AI agent calling an API and a human clicking a button reach the same service through the same authorization model (§164).
+- Automation must not introduce a second, independent implementation of any rule (§166).
+- Agents must not need to reverse-engineer the public website to understand platform capabilities (§163).
 
 ---
 
@@ -316,7 +337,7 @@ may be introduced later.
 
 - Node.js
 - Express (JavaScript, no TypeScript)
-- Mongoose (MongoDB object modeling)
+- Firestore via the `firebase-admin` Node SDK (server-side data access modules)
 - JSON Web Tokens (`jsonwebtoken`) for session/auth tokens
 - bcrypt for password hashing
 - Zod for request validation
@@ -344,17 +365,31 @@ Tokens are issued as short-lived access tokens + refresh tokens, stored in httpO
 
 ## 10. Database
 
-**Primary database:** MongoDB
+**Primary database:** Cloud Firestore
 
-MongoDB (accessed through Mongoose schemas/models) is the system of record for application data. It replaces Firestore in this architecture; document collections map directly to Mongoose collections/models (see §51–59 for the schema definitions, which apply unchanged to MongoDB collections).
+Firestore is the system of record for application data, accessed exclusively server-side through the `firebase-admin` Node SDK. Each data model in `backend/src/models/*.model.js` is a plain data-access module over a Firestore collection — there is no schema-definition layer, so the §51–59 field lists below are enforced in code (defaults, required fields, and secret-stripping) rather than by a schema. See `models/User.model.js` for the reference implementation of that pattern.
 
 Security must use:
 - Backend authentication (JWT) on every protected route
 - Backend authorization (role checks) on every admin route
 - Input validation (Zod) on every write endpoint
-- MongoDB connection restricted by network/IP allow-list and a dedicated database user with least-privilege access
+- Service-account credentials held only in environment variables/secret manager (§95), with the key file git-ignored and never committed
+- A dedicated, least-privileged service account per environment; the backend must never be reachable with a client-shipped Firebase config
 
-There are no client-side security rules (no Firestore Security Rules equivalent) — **all access control is enforced in Express middleware**, since the browser never talks to the database directly.
+**Firestore Security Rules are still not the access-control layer.** The browser never talks to Firestore directly — all reads and writes go through Express, so Firestore Rules are a defence-in-depth backstop, not the primary control. **All access control is enforced in Express middleware** before any Firestore call is made.
+
+### 10.1 Collection roadmap status (v1.3)
+
+The §51 collection list is a **target**, not a statement of what exists. Every collection carries an explicit status, and no implementation agent may treat a named collection as approved for implementation until its status is `Implemented` or `Planned` (§181).
+
+| Status | Meaning |
+|---|---|
+| **Implemented** | Data-access module exists in `backend/src/models/` and is covered by tests |
+| **Planned** | Approved in this PRD, sequenced in §182, not yet built |
+| **Deferred** | Explicitly out of V1 scope |
+| **Requires decision** | Named somewhere in the product surface but not reconciled in the domain model — **implementation is blocked** |
+
+Current true state: `users` and `auditLogs` are **Implemented**; every other named collection is unbuilt. The reconciliation items are tracked in §51.1.
 
 ---
 
@@ -412,7 +447,7 @@ Razorpay callback/webhook
   ↓
 Backend verification (HMAC signature check)
   ↓
-MongoDB transaction/update (Mongoose session)
+Firestore transaction/batched write
   ↓
 Booking confirmed
 ```
@@ -641,6 +676,10 @@ DAY 01
 - Cancellation policy
 - Booking CTA
 
+> **v1.4.** The list above states *which* information the page must carry. The **structure, ownership and contract** for that information — trip identity, overview, pickup/drop, day-wise itinerary, places covered, historical/cultural context, inclusions/exclusions, vehicle, accommodation, meals, seasonality, important information and booking summary — is defined canonically in **§185–§194**. Page composition (desktop and mobile) is **§195**; discoverability is **§196**; the agent interface is **§197**; the TripTemplate → Departure → Booking separation is **§198**.
+>
+> The day-wise itinerary is a **first-class structured domain element** (Trip → Day → Stop/Activity, order-preserving), **not** a single text blob. See §185.4.
+
 ---
 
 ## 21. Trip Template vs Departure
@@ -851,6 +890,10 @@ The mobile experience must feel like an application.
 
 Recommended: Home, Trips, Explore, Bookings, Account.
 
+> **Binding (v1.3, §168).** Bottom navigation is the **primary global navigation pattern** for the public mobile experience. A hamburger menu shall **not** be used as the default primary global navigation mechanism. Any deviation from the bottom-navigation pattern requires explicit product/design approval.
+>
+> The bottom-navigation system must define: active state, inactive state, icons, labels, safe-area handling, touch-target sizing, scroll interaction, accessibility, transitions, and contextual actions.
+
 **Visual language:**
 - Glass-like translucent surface
 - Backdrop blur
@@ -861,6 +904,8 @@ Recommended: Home, Trips, Explore, Bookings, Account.
 - Large touch targets
 
 The design should be SafarUp-branded, not a literal Apple UI clone.
+
+> **Binding (v1.3, §167, §169).** Desktop and mobile share the same brand and design system but have **independently designed** information hierarchy, composition, interaction patterns and navigation. Mobile shall not be a mechanically scaled-down desktop layout. Touch-appropriate patterns on mobile include horizontal carousels, bottom sheets, sticky actions, touch-friendly filters, swipe interactions, expandable sections and mobile-first search; desktop may use hover states, multi-column layouts, side filters, expanded navigation and richer spatial composition. The same functionality must remain understandable in both.
 
 ---
 
@@ -897,6 +942,10 @@ Desktop layouts can use:
 **Components**
 
 Button, Input, Select, Date picker, Search, Card, Trip card, Destination card, Price block, Availability indicator, Timeline, Itinerary day, Modal, Drawer, Toast, Dialog, Bottom navigation, Header, Footer, Skeleton, Empty state, Error state, Confirmation state.
+
+> **Binding (v1.3, §171).** SafarUp maintains a **centralized product design system** that is the visual source of truth for implementation. Major public experiences require intentional desktop **and** mobile compositions, and must use this centralized system rather than inventing per-screen styling. The Design Master (§159.1) owns it and prevents inconsistent AI-generated UI patterns across applications.
+>
+> The system is organised in three layers: **Foundations** (brand colors, typography, spacing, grids, radii, shadows, iconography); **Components** (buttons, navigation, bottom navigation, cards, search, filters, forms, dialogs, sheets, badges, trip cards, destination cards, itinerary components, booking components); and **Interaction States** (hover, active, focus, disabled, loading, success, error, empty).
 
 ---
 
@@ -989,6 +1038,8 @@ Day 2
 ```
 
 Support: reordering, add/remove activities, time editing, notes, media.
+
+> **v1.4.** This is the admin capability summary. The canonical, order-preserving Trip → Day → Stop/Activity structure that this builder edits — including the conceptual fields for each level, overnight marking and meal association — is defined in **§185.4**. Structured Trip content-management requirements beyond the itinerary are in **§199**.
 
 ---
 
@@ -1093,9 +1144,44 @@ No keyword stuffing.
 
 ---
 
-## 51. MongoDB Data Model
+## 51. Firestore Data Model
 
-Core collections (each backed by a Mongoose model/schema):
+Core collections, **with roadmap status** (v1.3; see §10.1 for the status vocabulary and §51.1 for reconciliation items). Each collection is accessed through a data-access module in `backend/src/models/`.
+
+| Collection | Status | Phase (§182) |
+|---|---|---|
+| `users` | **Implemented** | 0 |
+| `auditLogs` | **Implemented** | 0 |
+| `destinations` | Planned | 2 |
+| `districts` | Planned | 2 |
+| `categories` | Planned | 2 |
+| `places` | Planned | 2 |
+| `guides` | Planned | 2 (internal ops only) |
+| `tripTemplates` | Planned | 3 |
+| `itineraries` | Planned | 3 |
+| `departures` | Planned | 3 |
+| `bookings` | Planned | 4 |
+| `bookingTravelers` | Planned | 4 |
+| `payments` | Planned | 5 |
+| `privateTripRequests` | Planned | 2 |
+| `privateTripProposals` | Planned | 2 |
+| `hotels` | Planned | 2 |
+| `activities` | Planned | 2 |
+| `transportProviders` | Planned | 2 |
+| `refunds` | Planned | 5 |
+| `reviews` | Planned | 2 |
+| `blogPosts` | Planned | 2 |
+| `notifications` | Planned | 7 |
+| `supportTickets` | Planned | 2 |
+| `coupons` | Planned | 7 |
+| `settings` | Planned | 0 |
+| **slugClaims** | Planned | 2 — infrastructure, not a domain entity (see §51.3) |
+| **Guides** | Planned | 2 — internal ops only, see §51.1 |
+| **Categories** | Planned | 2 — N:M via `categoryIds[]`, see §51.1 |
+| **Districts** | Planned | 2 — 1:1 via `districtId`, see §51.1 |
+| **Places** | Planned | 2 — canonical entity, see §51.1 |
+
+Raw target list (for reference; status above is authoritative):
 
 ```
 users
@@ -1121,7 +1207,66 @@ settings
 auditLogs
 ```
 
-Every collection uses MongoDB's native `_id` (ObjectId) as primary key. Foreign references (e.g. `userId`, `tripTemplateId`) are stored as ObjectId references and populated via Mongoose `.populate()` where needed.
+Documents use Firestore's native auto-generated document ID as primary key. Foreign references (e.g. `userId`, `tripTemplateId`) are stored as document-ID strings and resolved explicitly by the data-access layer where needed.
+
+Two collections have bespoke keying rules, both for integrity guarantees rather than performance:
+
+- **`users`** — the document ID **is** the lowercased email address. Firestore has no unique-index constraint equivalent to a relational unique index, so keying by email makes a duplicate account impossible to create by construction. Creation is **transactional** (read-then-write inside `db.runTransaction`), because keying alone does not prevent two concurrent writes from clobbering each other.
+- **`auditLogs`** — auto-generated IDs via `.add()`, and the module deliberately exposes no update or delete function, keeping the log append-only (§59, §77).
+
+### 51.1 Domain model governance — resolved and unresolved entities (§181)
+
+Four entities appeared in the product surface without a domain-model position. **All four are now APPROVED (v1.5)** and recorded below. Per §181 these decisions are **not to be reopened**.
+
+| Entity | Where it appears | Decision | Status |
+|---|---|---|---|
+| **Guide** | §108 Guide Model; §107 partner entities | **Internal operational entity for V1.** A `guides` collection is allowed. Admin management is allowed. Guide may be associated with trips/departures where operationally required. **Not allowed in V1:** public guide marketplace, public guide discovery experience, separate `guide.safarup.in` portal. The §4 V1 non-goal on a public guide marketplace remains in force. | ✅ **APPROVED** |
+| **Category** | §173 Destination attributes; §42 hotel attribute; §49 blog attribute; §115 "Explore can contain: … Categories" | **First-class taxonomy entity.** A `categories` collection is allowed. **Destination → Category is MANY-TO-MANY** via `categoryIds[]`. Uncontrolled free-text category values must **not** be the canonical Destination relationship. | ✅ **APPROVED** |
+| **District** | §173 Destination attributes; §22 destination card "region" | **First-class canonical geographic entity.** A `districts` collection is allowed. **Destination → District is 1:1** via `districtId`. A free-form `region` string is **not** the canonical relationship. This **supersedes** the §51.2 interim proposal. | ✅ **APPROVED** |
+| **Place / Attraction** | §22 "Places to visit"; §173; §185.3; §186 (v1.4) | **First-class canonical entity**, part of the Phase 2 content foundation. Independently identifiable and referenceable across Destination, Trip itineraries, Places Covered, maps, search, SEO/AEO/GEO and agent resources. **Place records must never be duplicated** into individual destination or trip documents (§186). | ✅ **APPROVED** |
+
+**Canonical relationship model (v1.5):**
+
+```
+District    1:N  Destination
+Category    N:M  Destination      (categoryIds[])
+Place       N:M  Destination      (placeIds[])
+Destination 1:N  TripTemplate
+TripTemplate 1:1 Itinerary
+Itinerary   1:N  ItineraryDay
+ItineraryDay 1:N ItineraryStop / Activity
+ItineraryStop  →  may reference Place
+TripTemplate 1:N Departure
+Departure   1:N  Booking
+Booking     1:N  Traveler
+Booking     1:N  Payment
+```
+
+Where the PRD has not established a cardinality, it is **documented as a contract question**, not silently chosen. See §200 and `docs/CONTRACTS/`.
+
+#### 51.2 District — superseded
+
+The interim proposal that `region` be stored "as a **plain string field on the destination document** in V1" is **superseded and withdrawn**. District is a canonical entity and Destination references it via `districtId`. Do not implement a free-form `region` string as the canonical relationship.
+
+> **Naming note.** The PRD's public-facing language in §22 still describes a destination card field as "region". That is **display language**, satisfied by resolving `districtId` to the District's `name`. The stored relationship is `districtId`.
+
+#### 51.3 `slugClaims` — slug-uniqueness infrastructure (v1.5)
+
+Public content entities are addressed by a readable `slug` (§131). Firestore provides no unique constraint on a non-ID field, and a check-then-write is not atomic — the same class of defect that made `User.create()` unsafe in Phase 0, where a concurrent write could silently overwrite an account.
+
+A `slugClaims` collection therefore provides atomic slug claiming:
+
+| Aspect | Value |
+|---|---|
+| Document ID | **the slug string** |
+| Fields | `entityId`, `collection`, `createdAt` |
+| Scope | Shared across all slugged entities (`destinations`, `districts`, `categories`, `places`, and later trips/blog posts) |
+| Exposure | **Never** exposed through any API; never queried by a UI |
+| Classification | **Infrastructure, not a business entity** — it carries no product meaning and has no lifecycle |
+
+Creation of any slugged entity claims the slug and writes the document **inside one Firestore transaction**. Claiming and writing must never be split.
+
+A release mechanism is required if and only if slug mutation is permitted; that policy is open (§200.8), but any implementation that permits mutation must release the old claim in the same transaction that writes the new one.
 
 ---
 
@@ -1140,6 +1285,10 @@ Fields: `_id`, `email`, `passwordHash`, `displayName`, `photoURL`, `role`, `auth
 Collection: `tripTemplates`
 
 Fields: `_id`, `title`, `slug`, `destinationId` (ref `destinations`), `description`, `durationDays`, `durationNights`, `heroImage`, `gallery`, `basePrice`, `currency`, `status`, `featured`, `itineraryId` (ref `itineraries`), `inclusions`, `exclusions`, `terms`, `createdBy` (ref `users`), `updatedBy` (ref `users`), `createdAt`, `updatedAt`
+
+> **v1.4 — this field list is a baseline, not the final contract.** It predates the structured Trip Detail model and is **insufficient on its own**: a single `description` string cannot carry the Trip Detail experience.
+>
+> §185–§194 define the additional structured content a Trip Template must support (identity, overview, pickup/drop, day-wise itinerary, places covered, historical/cultural context, inclusions/exclusions, vehicle, accommodation, meals, seasonality, important information). §185 is the canonical content model. **Field-level names and collection boundaries for that content are not yet fixed** and are tracked in §200.4 — the Trip Detail contract must be approved before this list is extended, so that no implementation agent invents its own fields (§161, §181).
 
 ---
 
@@ -1244,7 +1393,7 @@ Backend:  Confirm booking.
 
 ## 63. Backend Access Control Model
 
-There is no client-side database, so there is no equivalent of Firestore Security Rules — every access rule is enforced by Express middleware and route handlers before any MongoDB query runs.
+There is no client-side database, so Firestore Security Rules are never on the critical path — every access rule is enforced by Express middleware and route handlers before any Firestore call runs. Rules may additionally be configured as a defence-in-depth backstop (see §10).
 
 Public/anonymous requests should only reach endpoints that return explicitly public data, e.g. published destinations, trips, blog posts (`GET`/read-only).
 
@@ -1341,7 +1490,7 @@ But coupons should not be unnecessarily complex in initial launch.
 - **Retry** — where appropriate.
 - **Network failure** — graceful recovery.
 
-Never expose raw Mongoose/Razorpay/server stack traces or internal error messages to customers — map them to human-readable messages at the API boundary.
+Never expose raw Firestore/Razorpay/server stack traces or internal error messages to customers — map them to human-readable messages at the API boundary.
 
 ---
 
@@ -1579,13 +1728,13 @@ Never develop directly against production data.
 
 ## 93. Database Environment Strategy
 
-Prefer separate MongoDB databases/clusters per environment:
+Prefer a separate Firebase project per environment:
 
 - `safarup-dev`
 - `safarup-staging`
 - `safarup-production`
 
-Each environment gets its own connection string (`MONGODB_URI`) supplied via environment variables, never hardcoded. This prevents development data from contaminating production.
+Each environment gets its own service-account credentials, supplied via environment variables (`FIREBASE_SERVICE_ACCOUNT_JSON`, or `FIREBASE_SERVICE_ACCOUNT_PATH` for local key files) and never hardcoded or committed (§95). Project selection is driven entirely by which credentials are loaded, so development data can never contaminate production. A service-account key file must be covered by `.gitignore` (see `backend/.gitignore`).
 
 ---
 
@@ -1634,7 +1783,7 @@ Pull requests should require build, type check, lint, and tests before merge.
 
 **Unit** — pricing, availability, cancellation, discount, state transitions.
 
-**Integration** — MongoDB (Mongoose models/queries), Razorpay, email delivery, scheduled jobs (node-cron).
+**Integration** — Firestore (data-access modules), Razorpay, email delivery, scheduled jobs (node-cron).
 
 **E2E (group trip)** — Browse → Select → Login → Book → Pay → Confirm
 
@@ -1907,7 +2056,7 @@ review_submitted
 
 ## 124. Performance Observability
 
-Monitor: Core Web Vitals, API/route latency, MongoDB query errors, payment failures, checkout conversion, API errors.
+Monitor: Core Web Vitals, API/route latency, Firestore errors, payment failures, checkout conversion, API errors.
 
 ---
 
@@ -1966,7 +2115,7 @@ Public URLs must be readable, e.g.:
 /blog/best-places-to-visit-in-bihar
 ```
 
-Avoid exposing raw MongoDB ObjectIds in public URLs.
+Avoid exposing raw Firestore document IDs in public URLs.
 
 ---
 
@@ -2177,7 +2326,7 @@ Before launch:
 ## 149. Development Phases
 
 **Phase 0 — Product foundation**
-Repository, monorepo (`backend`, `public`, `admin`), MongoDB environments, CI/CD, design tokens, authentication architecture, security baseline.
+Repository, monorepo (`backend`, `public`, `admin`), Firestore projects per environment, CI/CD, design tokens, authentication architecture, security baseline.
 
 **Phase 1 — Public foundation**
 Homepage, header, footer, destinations, destination details, trips, trip details, about, contact, policies.
@@ -2245,6 +2394,24 @@ Documentation
 
 all work correctly.
 
+### 151.1 Four mandatory quality gates (v1.3, §159, §176)
+
+The above chain is necessary but not sufficient. Every substantial feature must additionally pass all four specialist gates, and a feature is **not** complete merely because the application builds:
+
+```
+Design Master          PASS
+Discovery Master       PASS
+Agent-Native Master    PASS
+Engineering Master     PASS
+        ↓
+      Integration
+        ↓
+  Tests + Lint + Build
+```
+
+These are **permanent disciplines** that participate throughout development, not a final QA pass (§159). Where a gate is not applicable to a given feature, the Lead Agent must state that explicitly and record why (§183).
+
+See also the agent-friendly Definition of Done in §183 for the applicability checklist on public-facing capabilities.
 ---
 
 ## 152. Critical Business Rules
@@ -2367,7 +2534,7 @@ For the new SafarUp, these decisions are now the baseline:
 | Public application | React + Vite (JavaScript) |
 | Admin application | React + Vite (JavaScript) |
 | Backend | Node.js + Express (JavaScript) |
-| Database | MongoDB (Mongoose) |
+| Database | Cloud Firestore (server-side, via `firebase-admin`) |
 | Authentication | Custom (JWT + bcrypt), backend-issued sessions |
 | Email/password | Yes |
 | Google | Yes |
@@ -2384,5 +2551,1599 @@ For the new SafarUp, these decisions are now the baseline:
 | Core commercial object | Trip / Departure / Booking |
 | Private-trip workflow | Request → Proposal → Acceptance → Payment → Booking |
 | Payment verification | Server-side |
-| Booking capacity | Transaction-safe (MongoDB transactions/sessions) |
+| Booking capacity | Transaction-safe (Firestore transactions/batched writes) |
 | Admin | Operational source of truth |
+
+---
+
+## 157 — Product Architecture Evolution
+
+SafarUp shall be developed as a human-first, search-discoverable, AI-understandable, agent-operable, and automation-ready travel platform.
+
+SafarUp is not limited to being a conventional travel website.
+
+The platform shall support multiple interaction channels over the same underlying business capabilities:
+
+```
+Human
+ ├── Public Web
+ └── Future Mobile Application
+
+AI Agent
+ └── Machine-readable SafarUp capabilities
+
+Automation
+ └── Authorized SafarUp capabilities
+```
+
+The core business logic, authorization model, domain services, availability rules, booking rules, and payment rules shall remain centralized.
+
+User interfaces, AI agents, and automation systems shall act as clients of the same canonical platform capabilities.
+
+## 158 — Multi-Agent Development Architecture
+
+SafarUp development shall use a multi-agent engineering model.
+
+A Lead Agent shall coordinate specialized implementation agents and specialist quality masters.
+
+```
+                          LEAD AGENT
+                               │
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
+          ▼                    ▼                    ▼
+    BACKEND AGENT         ADMIN AGENT         PUBLIC AGENT
+          │                    │                    │
+          └────────────────────┼────────────────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              ▼                ▼                ▼
+       DESIGN MASTER      DISCOVERY MASTER   AGENT-NATIVE
+                                              MASTER
+              └────────────────┼────────────────┘
+                               ▼
+                    ENGINEERING MASTER
+```
+
+### Lead Agent
+
+The Lead Agent is responsible for:
+
+```
+architecture coordination
+task decomposition
+ownership assignment
+dependency management
+interface and contract definition
+conflict resolution
+integration
+cross-agent review
+milestone management
+```
+
+The Lead Agent does not need to implement every feature itself.
+
+### Backend Agent
+
+Responsible for:
+
+```
+Firestore
+repositories/data access
+domain models
+services
+APIs
+validators
+authentication
+authorization
+business logic
+server-side integrations
+```
+
+### Admin Agent
+
+Responsible for:
+
+```
+administration console
+CMS
+operational dashboards
+management workflows
+admin forms
+tables
+filtering
+administration UX
+```
+
+### Public Agent
+
+Responsible for:
+
+```
+public website
+discovery experience
+destination pages
+trip pages
+search
+booking experience
+responsive public UX
+```
+
+## 159 — Four Permanent Quality Masters
+
+SafarUp shall maintain four permanent specialist quality disciplines.
+
+### 159.1 Design / UI-UX Master
+
+The Design Master owns the product experience, including:
+
+```
+visual language
+design system
+typography
+color system
+spacing
+grid
+components
+responsive layouts
+desktop experience
+mobile experience
+interactions
+motion
+accessibility
+usability
+perceived quality
+```
+
+The Design Master shall prevent inconsistent AI-generated UI patterns across applications.
+
+### 159.2 Discovery Master
+
+The Discovery Master owns:
+
+```
+SEO
+AEO
+GEO
+semantic content structure
+metadata
+canonical URLs
+structured data
+internal linking
+crawlability
+sitemap
+robots directives
+entity relationships
+machine-readable content
+```
+
+Discovery requirements shall be considered during page and domain implementation, not added only after development.
+
+### 159.3 Agent-Native Architecture Master
+
+The Agent-Native Master owns:
+
+```
+AI-agent accessibility
+machine-readable resources
+API contracts
+OpenAPI documentation
+agent authentication
+permissions/scopes
+action contracts
+idempotency
+booking actions
+availability actions
+confirmation boundaries
+webhooks
+agent-readable errors
+automation interfaces
+auditability
+```
+
+### 159.4 Engineering Excellence Master
+
+The Engineering Master owns:
+
+```
+architecture quality
+code quality
+security
+performance
+accessibility
+testing
+CI/CD
+observability
+dependency hygiene
+database correctness
+error handling
+maintainability
+regression prevention
+```
+
+These four disciplines shall participate throughout development rather than only during final review.
+
+## 160 — Parallel Development Governance
+
+Multi-agent development shall be used to increase development speed without sacrificing consistency.
+
+Agents may work in parallel only when their work has clearly defined ownership and contracts.
+
+Before parallel work begins, the Lead Agent shall define:
+
+```
+task scope
+ownership
+dependencies
+shared interfaces
+API contracts
+data contracts
+expected outputs
+integration point
+```
+
+Agents should not independently redefine the same business entity.
+
+Agents should avoid simultaneously modifying the same high-conflict files unless explicitly coordinated.
+
+Shared architectural files and contracts require Lead Agent control.
+
+## 161 — Contract-First Development
+
+Before multiple agents implement the same domain capability, SafarUp shall define the canonical domain contract.
+
+A domain contract should specify:
+
+```
+Entity
+Fields
+Relationships
+Lifecycle
+Permissions
+Validation
+API representation
+Error behavior
+Persistence behavior
+Public representation
+Agent representation
+```
+
+Implementation shall follow the approved contract.
+
+The purpose is to prevent multiple agents from creating conflicting interpretations of the same domain.
+
+## 162 — Human-Agent Capability Parity
+
+Every major user capability shall be evaluated for an equivalent machine-operable capability.
+
+| Human Capability | Agent Capability |
+|---|---|
+| Search destinations | Search API |
+| Search trips | Trip query API |
+| View destination | Destination resource |
+| Compare trips | Structured trip data |
+| Check availability | Availability endpoint |
+| Prepare booking | Booking intent/action |
+| Complete booking | Authorized booking action |
+| Check booking | Booking status resource |
+| Cancel booking | Authorized cancellation action |
+
+Not every UI interaction requires a separate API operation.
+
+The underlying principle is:
+
+> The platform capability is canonical; the human interface and AI interface are clients of that capability.
+
+## 163 — Agent-Native Platform
+
+SafarUp shall expose structured platform capabilities that allow authorized agents to understand and interact with the travel platform.
+
+The system should support, where applicable:
+
+```
+discovery
+search
+filtering
+comparison
+destination information
+trip information
+itinerary information
+availability
+pricing
+booking preparation
+booking
+booking status
+cancellation
+account actions
+support actions
+future automation
+```
+
+AI agents must not need to reverse-engineer the public website to understand core SafarUp capabilities.
+
+The platform shall provide explicit machine-readable interfaces.
+
+## 164 — Agent Authentication, Authorization & Safety
+
+AI agents shall not receive unrestricted access to SafarUp.
+
+Agent access shall operate under explicit authorization.
+
+Actions shall be categorized according to risk.
+
+### Read / Discovery Actions
+
+Examples:
+
+```
+search
+view
+compare
+availability lookup
+itinerary retrieval
+```
+
+### Preparatory Actions
+
+Examples:
+
+```
+create a booking intent
+prepare traveler information
+calculate booking totals
+reserve a temporary workflow state where applicable
+```
+
+### Consequential Actions
+
+Examples:
+
+```
+confirm booking
+make payment
+cancel booking
+modify paid reservations
+change sensitive account information
+```
+
+Consequential actions shall require appropriate user authorization and platform permissions.
+
+The platform shall support explicit confirmation boundaries where appropriate.
+
+All consequential agent actions shall be auditable.
+
+## 165 — Agent-Native API Requirements
+
+SafarUp APIs intended for machine/agent consumption shall be:
+
+```
+predictable
+versionable
+documented
+validated
+authorization-aware
+idempotent where required
+explicit about errors
+machine-readable
+```
+
+The platform should maintain an OpenAPI specification for supported public/agent capabilities where appropriate.
+
+Agent-facing errors should provide structured information sufficient for an authorized client to understand whether an action:
+
+```
+succeeded
+failed validation
+requires authorization
+is unavailable
+conflicts with current state
+can be retried
+```
+
+## 166 — Automation Readiness
+
+SafarUp shall be architected to support future automation workflows.
+
+Examples include:
+
+```
+Watch for a trip matching user preferences
+Watch for availability
+Notify when conditions are met
+Prepare a travel plan
+Recommend matching trips
+Trigger an authorized booking workflow
+```
+
+Automation shall operate through the same canonical platform services and authorization boundaries as interactive user actions.
+
+Automation shall not introduce a second independent business-rule implementation.
+
+## 167 — Premium Responsive Experience
+
+SafarUp public experiences shall be intentionally designed for both desktop and mobile.
+
+Desktop and mobile shall share the same brand and design system but may use different information hierarchy, composition, interaction patterns, and navigation behavior.
+
+Mobile shall not be treated as a mechanically scaled-down desktop layout.
+
+The Design Master shall define both experiences intentionally.
+
+## 168 — Mobile Navigation
+
+The SafarUp public mobile experience shall use a persistent bottom navigation bar as the primary global navigation pattern.
+
+A hamburger menu shall not be used as the default primary global navigation mechanism.
+
+The mobile navigation system shall define:
+
+```
+active state
+inactive state
+icons
+labels
+safe-area handling
+touch target sizing
+scroll interaction
+accessibility
+transitions
+contextual actions
+```
+
+Any deviation from the bottom-navigation pattern requires explicit product/design approval.
+
+## 169 — Responsive Interaction Design
+
+Public SafarUp interfaces shall use touch-appropriate interaction patterns on mobile.
+
+Where appropriate, mobile may use:
+
+```
+horizontal carousels
+bottom sheets
+sticky actions
+touch-friendly filters
+swipe interactions
+expandable sections
+mobile image galleries
+mobile-first search
+context-aware actions
+```
+
+Desktop may use:
+
+```
+hover states
+multi-column layouts
+side filters
+expanded navigation
+richer map/content compositions
+desktop-specific information density
+```
+
+The same functionality should remain understandable across both experiences.
+
+## 170 — Motion & Animation System
+
+Motion shall be intentional and functional.
+
+Motion may be used to communicate:
+
+```
+navigation
+hierarchy
+state changes
+feedback
+progress
+discovery
+transitions
+```
+
+Motion shall not exist merely for decoration.
+
+SafarUp shall support reduced-motion preferences and avoid animations that materially damage performance, usability, accessibility, or content discoverability.
+
+## 171 — SafarUp Design System
+
+SafarUp shall maintain a centralized product design system.
+
+The design system shall include:
+
+### Foundations
+
+```
+brand colors
+typography
+spacing
+grids
+radii
+shadows
+iconography
+```
+
+### Components
+
+```
+buttons
+navigation
+bottom navigation
+cards
+search
+filters
+forms
+dialogs
+sheets
+badges
+trip cards
+destination cards
+itinerary components
+booking components
+```
+
+### Interaction States
+
+```
+hover
+active
+focus
+disabled
+loading
+success
+error
+empty
+```
+
+The approved design system shall serve as the visual source of truth for implementation.
+
+## 172 — SEO / AEO / GEO Architecture
+
+SafarUp shall treat discoverability as a product architecture concern.
+
+Every public entity/page shall be evaluated for:
+
+```
+search intent
+semantic HTML
+heading hierarchy
+page title
+description
+canonical URL
+internal links
+structured data
+entity identity
+related entities
+crawlability
+indexability
+machine-readable information
+```
+
+SEO, AEO, and GEO considerations shall be incorporated during design and implementation.
+
+## 173 — Machine-Readable Public Content
+
+Public SafarUp entities should expose information in a consistent and machine-understandable structure.
+
+Examples include:
+
+### Destination
+
+```
+name
+location
+district
+category
+description
+highlights
+travel information
+related destinations
+related trips
+```
+
+### Trip
+
+```
+title
+destination
+duration
+itinerary
+pricing
+availability
+booking state
+```
+
+### Booking
+
+```
+traveler
+trip
+departure
+status
+payment state
+```
+
+The specific schema shall follow the approved domain model.
+
+Structured information must remain consistent between:
+
+```
+database
+API
+public page
+metadata
+agent representation
+```
+
+> **Note.** `district` and `category` are now **resolved canonical relationships** (§51.1, §200.3): Destination → District is 1:1 via `districtId`; Destination → Category is N:M via `categoryIds[]`. The schema follows the approved domain model; this list is illustrative, not a field-level contract. Field-level contracts live in `docs/CONTRACTS/`.
+
+## 174 — Public Page Experience Standard
+
+Every major public page shall have an intentional desktop and mobile experience.
+
+Required page families include, subject to the approved domain model:
+
+```
+Homepage
+Explore/Search
+Destination
+Trip
+Itinerary
+Booking
+Profile
+Saved/Planning
+Other approved discovery/entity pages
+```
+
+Each page shall define:
+
+```
+Purpose
+Primary user intent
+Information hierarchy
+Primary action
+Secondary actions
+Desktop layout
+Mobile layout
+Interaction states
+Motion
+Accessibility
+SEO/AEO/GEO requirements
+Agent-native requirements
+```
+
+## 175 — Vertical Slice Development
+
+SafarUp shall prefer complete vertical slices instead of disconnected implementation.
+
+Example:
+
+```
+Domain
+  ↓
+Firestore
+  ↓
+Repository
+  ↓
+Service
+  ↓
+Validation
+  ↓
+Controller
+  ↓
+API
+  ↓
+Admin
+  ↓
+Public
+  ↓
+SEO/AEO/GEO
+  ↓
+Agent capability
+  ↓
+Tests
+  ↓
+Engineering review
+```
+
+A feature should not be considered complete merely because its frontend exists.
+
+## 176 — Quality Gates
+
+A substantial SafarUp feature shall pass four specialist gates.
+
+```
+Design Master
+        ↓
+Discovery Master
+        ↓
+Agent-Native Master
+        ↓
+Engineering Master
+        ↓
+Integration
+        ↓
+Tests
+        ↓
+Build
+```
+
+A feature is complete only when:
+
+```
+required design standards are satisfied
+discovery requirements are satisfied
+agent-native requirements are satisfied where applicable
+engineering requirements are satisfied
+tests pass
+lint passes
+builds pass
+```
+
+## 177 — Development Workflow
+
+The standard SafarUp development workflow shall be:
+
+```
+PRD Requirement
+        ↓
+Lead Agent Analysis
+        ↓
+Domain / Contract Definition
+        ↓
+Design Definition
+        ↓
+Discovery Definition
+        ↓
+Agent-Native Definition
+        ↓
+Engineering Definition
+        ↓
+Parallel Agent Implementation
+        ↓
+Integration
+        ↓
+Specialist Review
+        ↓
+Testing
+        ↓
+Release
+```
+
+Parallel implementation may begin only after the relevant contracts are sufficiently defined.
+
+## 178 — Design-to-Code Workflow
+
+> **Superseded (v1.5).** The v1.4 Figma-based workflow is withdrawn. SafarUp does **not** use Figma as the binding design workflow, does not require Figma for implementation, and does not treat Figma as a project gate. The visual source of truth is now **`docs/DESIGN_SYSTEM.md` + implementation + browser/screenshot visual review**. See §178.1.
+
+For major public experiences, the workflow is:
+
+```
+PRD
+  ↓
+Design Master
+  ↓
+docs/DESIGN_SYSTEM.md
+  ↓
+Desktop + Mobile design intent
+  ↓
+OpenCode implementation
+  ↓
+Browser / screenshot visual review
+  ↓
+Design Master feedback
+  ↓
+Refinement + design-system update
+  ↓
+Engineering validation
+```
+
+The implementation follows the documented design system instead of independently inventing a visual system.
+
+### 178.1 OpenCode-managed design workflow (binding, v1.5)
+
+- The engineering-facing design authority is **`docs/DESIGN_SYSTEM.md`**, maintained by the Design Master and living in the repository.
+- **Figma is not required**, is not a gate, and is never dispatched work. Any Figma artifact present is advisory, never binding.
+- The Design Master may inspect the running application and use screenshots or other local visual validation through OpenCode, **but every final design decision is captured in `docs/DESIGN_SYSTEM.md` and in code** — never only in a local session or a comment.
+- Coding agents shall **not** independently redesign the product. If a pattern is missing from the design system, the Design Master extends the document; the pattern is not invented ad hoc per page.
+- One visual language persists across Home, Explore, Destination, Trip, Booking, Profile and future public pages (§171, §24 of the multi-agent development plan).
+- The design system is **evolving**: the Design Master refines it as implementation reveals reusable patterns, and that refinement is a repository change, not a private one.
+
+## 179 — Product Retention Principles
+
+SafarUp shall prioritize retention through usefulness and continuity, not excessive visual stimulation.
+
+Retention mechanisms may include:
+
+```
+saved destinations
+saved trips
+personalized discovery
+trip planning
+comparisons
+recommendations
+booking history
+travel preferences
+availability alerts
+future AI travel assistance
+authorized automation
+```
+
+Animation and visual effects shall support the experience but shall not be treated as the primary retention mechanism.
+
+## 180 — Booking & Automation Evolution
+
+The booking architecture shall be designed so that future AI-assisted and automated booking can operate on the same booking state model used by human users.
+
+Future flow:
+
+```
+Discover
+  ↓
+Compare
+  ↓
+Availability
+  ↓
+Booking Intent
+  ↓
+User Authorization
+  ↓
+Booking
+  ↓
+Payment
+  ↓
+Confirmation
+```
+
+Future automation may operate on this workflow where the user's authorization and platform policy permit it.
+
+## 181 — Domain Model Governance
+
+The PRD is the authority for domain entities and relationships.
+
+No implementation agent may create a new business entity solely because another prompt, UI design, or implementation plan mentions it.
+
+Any discrepancy between:
+
+```
+PRD entities
+collection model
+API model
+UI requirements
+agent capabilities
+```
+
+must be resolved by an explicit product/architecture decision before implementation.
+
+### Current items requiring explicit reconciliation
+
+```
+Guide          → RESOLVED (v1.5): internal operational entity, no public marketplace
+Category       → RESOLVED (v1.5): first-class taxonomy, Destination N:M via categoryIds[]
+District       → RESOLVED (v1.5): first-class entity, Destination 1:1 via districtId
+Place          → RESOLVED (v1.5): first-class canonical entity; field contract still open
+```
+
+The current development plan must not assume these entities have the same lifecycle or collection status until the PRD is reconciled. **These four are now reconciled; the plan must treat them as decided and must not reopen them.**
+
+The current reconnaissance specifically identified a discrepancy around Guide and notes that Guide marketplace functionality is treated as a V1 non-goal in the current PRD. **That non-goal remains in force:** Guide is an internal operational entity only, and no public Guide UX may be built (§200.1).
+
+> Resolution tracking for these entities is maintained in **§51.1** and **§200**. **All four are now APPROVED (v1.5)** and are **not to be reopened**: Guide (internal operational entity), Category (first-class taxonomy, N:M via `categoryIds[]`), District (first-class entity, 1:1 via `districtId`), and Place/Attraction (first-class canonical entity). **§200 is the authoritative decision log** for the items that genuinely remain open.
+
+## 182 — Development Phase Model
+
+The previous development phases shall be extended to include the new architecture.
+
+```
+PHASE 0
+Foundation
+✓ Completed
+
+PHASE 1
+PRD + Domain + Contract Definition
+
+PHASE 2
+Content / Destination Foundation
+
+PHASE 3
+Trip Product
+TripTemplate
+Itinerary
+Departure
+
+PHASE 4
+Group Booking
+
+PHASE 5
+Payment
+
+PHASE 6
+Agent-Native Capabilities
+
+PHASE 7
+AI-Assisted Travel Workflows
+
+PHASE 8
+Automation
+
+PHASE 9
+Scale / Optimization
+```
+
+The four permanent Masters operate across all phases.
+
+### 182.1 Phase content and entry gates (v1.4)
+Each phase has an **entry gate**: it cannot begin until the prior phase's contracts are approved. The gate exists to prevent agents implementing against an unapproved contract (§160, §161).
+
+| Phase | Content | Entry gate — must be approved first |
+|---|---|---|
+| **0** | Foundation (auth, Firestore, tests, CI) | — **Complete** |
+| **1** | PRD + domain + contract definition | ✅ **COMPLETE** — four-Master review passed 2026-09-29 (§182.2) |
+| **2** | Content / Destination foundation — District, Category, Place, Destination | ✅ **Gate closed** — all Phase 2 contracts `APPROVED`. Active phase |
+| **3** | Trip Product — TripTemplate, Itinerary, Departure | **Trip Detail field-level contract (§200.4)**; pickup/drop inheritance (§200.5). `places` entity gate is **cleared** (v1.5) |
+| **4** | Group Booking — Booking, Travelers | Booking model + availability contract; §48 cancellation policy |
+| **5** | Payment | §12–§13, §58, §94 |
+| **6** | Agent-Native Capabilities | §165 API contract, OpenAPI, agent auth model (§164) |
+| **7** | AI-Assisted workflows | Phase 6 capabilities |
+| **8** | Automation | Phase 6 + booking intent/confirmation boundaries (§180) |
+| **9** | Scale / optimization | — |
+
+> **Note.** Trip Detail content architecture is specified in **§185–§200** and is delivered in **Phase 3** (public/admin surfaces) with agent capabilities landing in **Phase 6** per §197. §200.4 currently blocks Phase 3 entry.
+
+### 182.2 Phase 1 completion gate (v1.5)
+
+Phase 1 is complete when **all** of the following are **APPROVED** in `docs/CONTRACTS/` (lifecycle §11 of the multi-agent development plan). Only then may Phase 2 begin.
+
+| # | Gate item | Artifact | Status |
+|---|---|---|---|
+| 1 | PRD domain decisions recorded | §51.1, §200.1–200.3 | ✅ Done |
+| 2 | Destination contract | `DESTINATION.domain.contract.md` | ✅ **APPROVED** |
+| 3 | District contract | `DISTRICT.domain.contract.md` | ✅ **APPROVED** |
+| 4 | Category contract | `CATEGORY.domain.contract.md` | ✅ **APPROVED** |
+| 5 | Place contract | `PLACE.domain.contract.md` | ✅ **APPROVED** |
+| 6 | Destination API contract | `API.destination.contract.md` | ✅ **APPROVED** |
+| 7 | Place API contract | `API.place.contract.md` | ✅ **APPROVED** |
+| 8 | Destination Firestore contract | `FIRESTORE.destination.contract.md` | ✅ **APPROVED** |
+| 9 | Place Firestore contract | `FIRESTORE.place.contract.md` | ✅ **APPROVED** |
+| 10 | Repository architecture contract | `REPOSITORY_ARCHITECTURE.contract.md` | ✅ **APPROVED** |
+| 11 | Design requirements | `docs/DESIGN_SYSTEM.md` | ✅ **APPROVED** |
+| 12 | Discovery requirements | Reviewed into every public contract | ✅ **PASS** |
+| 13 | Agent-Native requirements | Reviewed into every API contract | ✅ **PASS** |
+| 14 | Engineering requirements | Reviewed into every Firestore/API contract | ✅ **PASS** |
+| 15 | Multi-agent operating rules | `docs/MULTI_AGENT_DEVELOPMENT.md` | ✅ **APPROVED** |
+| 16 | Design system rules | `docs/DESIGN_SYSTEM.md` | ✅ **APPROVED** |
+
+> **Phase 1 — CONTRACT APPROVAL COMPLETE.** All sixteen gate items are satisfied as of the 2026-09-29 four-Master review. **Phase 2 is the active development phase.** Worker dispatch remains a separate authorisation.
+
+**Residual conditions carried into Phase 2** (each is scoped, tracked and non-blocking):
+
+| Item | Treatment |
+|---|---|
+| `thingsToDo` structure (§200.8) | The §22 section is required; the field waits on the §200.8 decision. Blocks that field only |
+| `multer` media upload | Scoped out of the initial Phase 2 backend slice (`API.destination.contract.md` §3). Media fields are URL values |
+| Public search (`q`) | Not implemented in Phase 2; explicit 400 (`API.destination.contract.md` §2.1b) |
+| Public app has no Tailwind / router / API client | Established as a prerequisite before public UI work (`docs/DESIGN_SYSTEM.md` §12.1) |
+| §200.4–§200.10 | Later-phase decisions. §200.4 blocks Phase 3, not Phase 2 |
+
+## 183 — Agent-Friendly Definition of Done
+
+A feature that exposes a meaningful public capability should, where applicable, satisfy the following:
+
+```
+✓ Human UI exists
+✓ Mobile experience exists
+✓ Desktop experience exists
+✓ Accessible interaction exists
+✓ SEO requirements satisfied
+✓ AEO/GEO structure satisfied
+✓ Machine-readable representation exists
+✓ API capability exists
+✓ Authorization defined
+✓ Idempotency defined for consequential mutation
+✓ Auditability defined
+✓ Tests exist
+✓ Performance reviewed
+✓ Security reviewed
+```
+
+Not every item applies identically to every internal/admin feature, but the Lead Agent shall explicitly determine applicability.
+
+## 184 — Core SafarUp Principle
+
+SafarUp is a human-first, search-discoverable, AI-understandable, agent-operable, and automation-ready travel platform.
+
+All future architectural, product, UX, API, database, and development decisions should be evaluated against this principle.
+
+---
+
+# Part IV — Trip Detail & Group Booking Content Architecture (v1.4)
+
+> This part defines the structured content model behind SafarUp's Trip Detail page. It is an **information architecture**: it specifies which structured areas a Trip must support and how they relate, without hard-coding any specific trip as a product record.
+>
+> **Content principle (§28).** SafarUp content is **structured product data first, rendered experience second**:
+>
+> ```
+> Trip data
+>   ↓
+>  API
+>   ├── Public UI
+>   ├── Admin CMS
+>   ├── SEO/AEO/GEO
+>   ├── AI agents
+>   └── Booking engine
+> ```
+>
+> No consumer surface becomes the hidden source of truth. The public page, the admin CMS, the search index and the agent interface are all *renderings* of the same structured trip data.
+>
+> **Reference model.** The structure below is derived from a canonical SafarUp group trip (a 2 Days / 1 Night, October–February "Explorer" trip covering temples, heritage, hills, forests, local culture and seasonal wildlife). That example defines the **content structure and experience model only**. Its factual claims — destinations, timings, inclusions, seasonal facts — are **not** validated, corrected or invented here, and are not encoded as a product record. Where a rule depends on facts not established in this document, it is marked unresolved in §200 rather than assumed.
+
+## 185. Trip Detail Content Model
+
+### 185.1 Trip identity
+
+Every Trip Template must be able to express the following identity concepts. Naming follows the existing domain convention (`title`, `slug`, `durationDays`, `durationNights`, `heroImage`, `gallery` per §53); where a concept has no established name it is described, not named.
+
+| Concept | Notes |
+|---|---|
+| Trip title | §53 `title` |
+| Short subtitle / tagline | Concept new to §53; short-form hook for cards and hero |
+| Destination / region | §53 `destinationId`; District relationship per §51.1/§200.3 (`districtId`) |
+| Duration | §53 `durationDays`, `durationNights` |
+| Season | Operating season — see §192 |
+| Starting point | Also surfaced in pickup/drop (§185.3) |
+| Ending point | Also surfaced in pickup/drop (§185.3) |
+| Overnight location | Where the group stays; see §190 |
+| Group size | Min/max or policy — see §189/§190, which are group-dependent |
+| Guide information | §200.1 — Guide is an **approved internal operational entity** (§51.1). A trip may reference a Guide for operations, but must express a guide *model/policy* so it is not structurally dependent on one |
+| Trip type | e.g. group / heritage / nature / wildlife classification |
+
+Media and summary: `heroImage`, `gallery`, and a short summary are supported (§53 already defines `heroImage`/`gallery`). Saving/favouriting a trip is a traveler capability and is **not** part of the Trip entity — it belongs to a user-owned saved-items concern (§179 lists "saved trips"); it is not specified here.
+
+> **Unresolved:** the concept list above deliberately does **not** assign field names to new concepts. Field-level naming is part of the Trip Detail contract and is tracked in §200.4.
+
+### 185.2 Trip overview
+
+The overview is a **structured summary**, not a prose blob. It must be able to express:
+
+```
+summary
+experience description
+trip highlights
+duration
+starting point
+ending point
+operating season
+group capacity
+guide model
+overnight information
+```
+
+The public UI may render this as a concise summary block, while the API exposes the individual structured fields. The same data serves the hero, the quick-facts strip, the agent representation (§197) and structured data (§196).
+
+> **Note on `guide model`.** The reference model includes guide information. Guide is now an **approved internal operational entity** (§51.1, §200.1), so a Trip **may** reference a Guide where operationally required. It must still be able to express a guide *model/policy* (e.g. accompanied / self-guided / on-request) **without** structurally depending on a `guides` reference, so that a trip remains valid if no Guide is assigned. No **public** Guide UX is permitted in V1.
+
+### 185.3 Pickup & drop
+
+Pickup and drop must be represented **independently of the general description**, because they are operationally significant and are needed by the booking summary (§194), the traveler view and agent responses.
+
+Must support:
+
+```
+pickup locations
+pickup instructions
+supported arrival points
+drop locations
+drop instructions
+coordination notes
+```
+
+Locations should be **linkable to structured place/location data where the domain model allows it** (§200.2 — the `places` entity is now **approved** as a first-class canonical entity).
+
+> **Note.** §54 `Departure` already carries `pickupLocations`. Whether a departure may *override* a trip-level default, or must inherit it, is not settled by the source material. Tracked in §200.5.
+
+### 185.4 Day-wise itinerary (first-class structured element)
+
+The itinerary is a **first-class structured domain element**. It must **not** be represented as one plain-text blob.
+
+```
+Trip
+  ↓
+Day  (ordered)
+  ↓
+Stops / Activities  (ordered, independently identifiable)
+```
+
+**Day concepts:** day number, title, summary, start location, end location, sequence, stops/activities, descriptions, approximate timing where available, location information, overnight status, meal associations where applicable, operational notes.
+
+**Ordering must be preserved.** Reordering is an explicit admin capability (§40) and the public and agent renderings must reflect stored order, not incidental document order.
+
+The reference model is shaped like:
+
+```
+Day 1
+  ↓
+  ├── [stop 1]
+  ├── [stop 2]
+  ├── ...
+  └── [overnight stop]
+
+Day 2
+  ↓
+  ├── [stop 1]
+  └── [final stop / return]
+```
+
+Each stop must be independently identifiable, so that it can be referenced (§186), rendered, localised and later linked to a canonical place (§200.2).
+
+## 186. Places covered
+
+A Trip should be able to reference **structured SafarUp place entities** rather than duplicating them.
+
+Reference categories from the source material:
+
+```
+Spiritual & Cultural
+Heritage
+Hills & Nature
+Wildlife & Seasonal Attractions
+```
+
+**These must not be duplicated as independent copies.** Places are **references to canonical place/destination entities** where the domain model allows it. This matters for internal linking, destination discovery, SEO/AEO/GEO (§196), agent interfaces (§197) and future recommendation systems.
+
+> **✅ RESOLVED (v1.5).** Place / Attraction is now a **first-class canonical entity** with a `places` collection (§51.1, §200.2). Places Covered is implemented as an **N:M reference** from Destination to Place via `placeIds[]`.
+>
+> Place records are **never duplicated** into destination or trip documents. A Place is independently identifiable and reusable across Destination, Trip itineraries, maps, search, SEO/AEO/GEO and agent interfaces. The Place **field-level** contract remains open (§200.9) and does not block the relationship itself.
+
+## 187. Historical & cultural context
+
+Trips may contain **structured contextual content** explaining:
+
+```
+historical importance
+cultural importance
+spiritual context
+ecological / natural context
+local significance
+```
+
+This content is **editorial/product content** and must not be mixed into operational booking data.
+
+**Attribution-ready by design.** Where the platform later supports source attribution or editorial verification, the architecture must allow it **without forcing it into unrelated trip fields**. This is a structural constraint on the future contract — the content area must be able to carry provenance (source, verification status, last-reviewed date) when those concepts are introduced, rather than requiring a later re-modelling of trip documents.
+
+> **Not specified here:** the fields, structure, and editorial workflow. The source material defines the *existence* and *separation* of this content area, not its schema. Tracked in §200.6.
+
+## 188. Inclusions & exclusions
+
+Inclusions and exclusions must be **structured as separate lists**, not one paragraph and not one combined field.
+
+**Included** (from the reference model): pickup, drop, transportation, vehicle, guide, accommodation, breakfast, lunch, dinner, coordination/assistance, planned sightseeing.
+
+**Excluded** (from the reference model): entry fees, personal expenses, shopping, additional food/beverages, personal itinerary changes, medical/emergency expenses, unspecified services.
+
+> **Note.** §53 already lists `inclusions` and `exclusions` on the trip template, so this area is largely covered by the existing model. §185–§194 do not redefine it; they confirm it must remain **two distinct structured lists** so that the UI (§195), agent representation (§197) and booking summary (§194) can each consume them independently.
+
+## 189. Vehicle
+
+Vehicle requirements are **group-dependent**. Trip data must support:
+
+```
+vehicle policy
+possible vehicle types
+group-size dependency
+comfort requirements
+route requirements
+```
+
+**Do not force a single vehicle type when actual operations may select the vehicle after group size is known.** A trip expresses a *policy and a set of possibilities*; the concrete assignment is an operational decision (§198).
+
+## 190. Accommodation
+
+Accommodation must be **independently represented**, supporting:
+
+```
+location
+accommodation policy
+availability dependency
+safety / comfort criteria
+group-size dependency
+room allocation notes
+overnight location
+```
+
+**Do not assume one permanent property if the business model allows accommodation to vary.** A trip states a policy; a specific property may be resolved per departure.
+
+> **Overlap with the `hotels` collection (§51).** `hotels` exists in the collection list and §42 covers hotel management. The relationship between a trip's accommodation *policy* and a concrete `hotels` record is **not** defined by the source material. Tracked in §200.7.
+
+## 191. Food & meals
+
+Meal information must be structured:
+
+```
+Day
+  ↓
+Meal
+```
+
+Example shape from the reference model:
+
+```
+Day 1 → Lunch, Dinner
+Day 2 → Breakfast, Lunch
+```
+
+This data must be usable by the **booking summary** (§194), the **traveler view**, **admin operations**, and **agent responses** (§197) — so it is stored as structured day/meal associations rather than prose, and is not duplicated per departure.
+
+## 192. Seasonality
+
+Seasonality is an important Trip attribute. The system must distinguish:
+
+```
+operating season
+recommended travel season
+seasonal attractions
+seasonal limitations
+seasonal availability
+```
+
+**Do not assume that all attractions operate identically throughout the year.** A trip operating October–February does not imply every covered place has the same seasonal behaviour; that is what `seasonalAttractions` and `seasonalLimitations` exist to express.
+
+> **Relationship to §54.** Departure-level availability is distinct from trip-level seasonality. Seasonality is a property of the **Trip Template**; a specific **Departure** is only offered if it falls within the operating season (§198).
+
+## 193. Important information
+
+A trip must support **structured operational/advisory information**:
+
+```
+weather dependency
+road conditions
+accessibility
+site availability
+activity limitations
+guest responsibilities
+wildlife viewing limitations
+local rules
+personal safety reminders
+personal belongings responsibility
+```
+
+Structured as informational items where practical, so they can be rendered consistently and surfaced in booking/traveler contexts rather than buried in a description.
+
+## 194. Trip booking summary
+
+The Trip Detail experience must connect to a **booking capability**. A user must be able to understand, at minimum:
+
+```
+trip
+date / departure
+duration
+group size
+pricing
+availability
+inclusions
+exclusions
+pickup / drop
+accommodation
+cancellation / relevant policy where defined
+```
+
+**The exact booking fields must follow the existing PRD booking model** (§55, §54). **No unsupported pricing or cancellation rule is introduced here** — cancellation and pricing rules are owned by §48, §103 and §104, and this section only requires that the Trip Detail surface them where defined.
+
+Live availability and price are **departure** properties, not trip properties (§198).
+
+## 195. Trip Detail page composition
+
+Desktop and mobile are **independently composed** experiences sharing one design system (§167, §171). The mobile composition is **not** the desktop composition scaled down.
+
+### 195.1 Desktop experience
+
+Conceptual composition:
+
+```
+Hero
+  ↓
+Trip identity
+  ↓
+Quick facts
+  ↓
+Main content + sticky booking panel
+  ↓
+Trip Overview
+  ↓
+Pickup & Drop
+  ↓
+Interactive Day-wise Itinerary
+  ↓
+Places Covered
+  ↓
+Historical / Cultural Context
+  ↓
+Included / Excluded
+  ↓
+Vehicle
+  ↓
+Accommodation
+  ↓
+Food
+  ↓
+Best Time
+  ↓
+Important Information
+  ↓
+Related experiences / destinations
+  ↓
+Final CTA
+```
+
+Desktop may use multi-column layouts, a **sticky booking panel**, larger gallery, itinerary timeline, map integration and side information cards. The mobile composition is **not** forced onto desktop.
+
+### 195.2 Mobile experience
+
+Conceptual composition:
+
+```
+Hero
+  ↓
+Trip identity
+  ↓
+Quick facts
+  ↓
+Overview
+  ↓
+Pickup / Drop
+  ↓
+Itinerary
+  ↓
+Places
+  ↓
+Cultural context
+  ↓
+Included / Excluded
+  ↓
+Vehicle
+  ↓
+Stay
+  ↓
+Food
+  ↓
+Best time
+  ↓
+Important information
+```
+
+Mobile may use swipeable galleries, expandable sections, an itinerary timeline, bottom sheets, a **sticky booking action**, touch-friendly controls and horizontal cards.
+
+**Binding navigation rule (§168).** Global navigation on public mobile uses the **established bottom navigation pattern**. A **hamburger menu must not** be introduced as the primary global navigation. The booking CTA may use a **sticky action area above** the global bottom navigation, so the two do not collide.
+
+### 195.3 Premium experience standard
+
+The Trip Detail page is **premium travel editorial + trip planner + group booking product**. It must not degrade into a plain document. Information should be easy to scan while detail remains available, using hierarchy, visual grouping, cards, timelines, maps, imagery, progressive disclosure and clear CTAs.
+
+**Motion** communicates progress, state, navigation, itinerary position and booking feedback. It must not exist for decoration (§170), must respect `prefers-reduced-motion`, and must not be added at the cost of performance (§167).
+
+## 196. Trip Detail SEO / AEO / GEO
+
+The Trip Detail page is an **indexable travel entity**. It must support:
+
+```
+stable trip URLs
+title
+description
+canonical URL
+semantic heading structure
+internal links
+destination relationships
+itinerary information
+duration
+season
+availability / pricing where indexability rules permit
+structured data
+machine-readable content
+related destinations
+related trips
+```
+
+Search engines and answer engines must be able to understand the trip **without relying on visual rendering alone** — this is a direct requirement of the structured content model (§185) and of §172/§173.
+
+**AEO/GEO content must be factual, structured and directly supported by SafarUp data.** **No hidden keyword stuffing.** Structured information must remain consistent between database, API, public page, metadata and agent representation (§173).
+
+Slugs remain readable and must not expose raw Firestore document IDs (§131). URL rules are governed by §132.
+
+## 197. Agent-native Trip interface
+
+An AI agent must be able to answer the following **from structured platform capabilities, without scraping the visual page**:
+
+```
+What is this trip?
+How long is it?
+Where does it start?
+Where does it end?
+What season does it operate?
+What places are covered?
+What is the itinerary?
+Where is the overnight stay?
+What is included?
+What is not included?
+What meals are provided?
+What group size is supported?
+What dates are available?
+What does it cost?
+Can I prepare a booking?
+```
+
+Every one of these is answerable only if the corresponding content area exists as **structured data** (§185–§194) — which is the architectural argument for this model over a description blob.
+
+Capability phases (aligned with §182):
+
+| Phase | Capability |
+|---|---|
+| 3 | GET trip, GET itinerary |
+| 4 | GET availability, GET pricing, CREATE booking intent |
+| 4/5 | CONFIRM booking (consequential — see §164) |
+
+**Consequential actions require explicit authorization** (§164): booking confirmation, payment, cancellation and account changes are not available to an agent without appropriate authorization, confirmation boundaries, idempotency and audit logging (§165, §183).
+
+**All agent actions use the same services and authorization model as human actions** (§157, §162, §166). There is no separate agent-only business-logic path.
+
+> **The final API design must follow the canonical backend contract** and is not authored here. This section defines *capabilities*, not endpoints.
+
+## 198. Group booking model
+
+The following are **distinct concepts and must not be collapsed into one object**:
+
+```
+Trip Template
+        ↓
+Departure (scheduled instance)
+        ↓
+Group Booking
+        ↓
+Participants / Travelers
+        ↓
+Payment
+```
+
+| Concept | Represents | Owns |
+|---|---|---|
+| **Trip Template** (§53) | *What the trip is* — the reusable product | identity, content (§185–§193), base price, media, itinerary reference |
+| **Departure** (§54) | *When this specific trip happens* | date, return date, actual availability, capacity, operational allocation, applicable pricing |
+| **Booking** (§55) | A user's actual transaction | booking number, traveler count, totals, status, payment status |
+| **Traveler** (`bookingTravelers`) | Individual participants | per-traveler details |
+| **Payment** (§58) | Money movement | order/payment IDs, amount, status, signature verification |
+
+The **Trip Detail page describes the reusable trip product** (Trip Template). A **specific departure** determines date, actual availability, current capacity, operational allocation and applicable pricing. A **booking** represents a user's actual transaction.
+
+Consequences:
+
+- Trip-level content (§185–§193) is **not duplicated per departure**.
+- Meals (§191) and itinerary (§185.4) are template-level, not per-booking.
+- Seat/seat-count logic belongs to the Departure, and is transaction-safe (§152 → ADR "Transaction-safe").
+- Capacity, price and availability shown on the Trip Detail page are **departure-derived** and may be absent when no departure is open — an empty state, not a zero (§112).
+
+This restates and reinforces the existing §21 distinction; it does not replace it.
+
+## 199. Trip content management (admin CMS)
+
+Admin users **must not** be forced to edit a single giant text field. The CMS must support structured editing of:
+
+```
+overview
+pickup / drop
+itinerary days
+itinerary stops
+places covered
+inclusions
+exclusions
+vehicle
+accommodation
+meals
+seasonality
+important information
+media
+SEO metadata
+structured content
+```
+
+Beyond the existing §40 itinerary builder, this implies:
+
+- **Structured, field-level editing** per content area (§185–§193), each with its own validation.
+- **Preview** that renders against the same contract the public page consumes (§195), so a content error is visible before publishing.
+- **Publishing workflow** consistent with §78 (Draft → Review → Publish → Update → Archive); trips are not deleted unnecessarily.
+- **Audit logging** for significant mutations (§59, §77).
+- **Role enforcement**: content edits vs. operational/financial changes remain separated by role (§60).
+
+> **Unresolved:** concrete CMS screens, field-level validation rules, and preview mechanics are design/implementation detail for the Admin Agent **once the Trip Detail contract is approved**. Specifying them before then would encode an unapproved schema.
+
+## 200. Domain decisions
+
+Per §181, an implementation agent may **not** create a business entity because a prompt, UI design or implementation plan mentions it. This section is the authoritative decision log.
+
+### 200.1 Guide — ✅ RESOLVED (v1.5)
+
+| | |
+|---|---|
+| **Appears in** | §108 (Guide Model), §107 (partner entities), §185.1/§185.2 (guide information / guide model) |
+| **Earlier conflict** | No `guides` collection in §51; §4 listed a public guide marketplace as a V1 non-goal; §108 ruled out a `guide.safarup.in` portal |
+| **Decision** | **Guide is an internal operational entity for V1.** A `guides` collection is **allowed**. Admin management is **allowed**. Guide may be **associated with trips/departures** where operationally required, and with future operational booking relationships. |
+| **Still not allowed in V1** | Public guide marketplace · public guide discovery experience · separate guide portal. The §4 non-goal stands. **No public Guide UX may be built.** |
+| **Constraint on Trip** | Trip expresses a *guide model / policy* (§185.2). Now that a `guides` entity is permitted, a Trip **may** reference a Guide for operations, but the model is not required to depend on one. |
+
+### 200.2 Place / Attraction entity — ✅ RESOLVED (v1.5)
+
+| | |
+|---|---|
+| **Appears in** | §22 ("Places to visit"), §173, §185.3 (linkable pickup/drop locations), §186 (Places Covered) |
+| **Earlier conflict** | The collection model had no `places` collection, while §22/§173 assume place-level content and §186 requires references to canonical place entities and forbids duplication |
+| **Decision** | **Place / Attraction is a first-class canonical entity**, part of the **Phase 2 content foundation**. A `places` collection is **allowed**. A Place is **independently identifiable and referenceable** across Destination, Trip itineraries, Places Covered, maps, search, SEO/AEO/GEO, agent-readable resources and future recommendation systems. |
+| **Hard constraint** | **Place records must never be duplicated** into individual destination or trip documents (§186). Trips reference Places from itinerary stops; Destinations reference them from Places Covered. |
+| **Still open** | Field-level detail (§200.9) and whether a public `/places/:slug` route exists (§200.6). These do **not** block the entity. |
+
+### 200.3 Category and District — ✅ RESOLVED (v1.5)
+
+| Entity | Decision |
+|---|---|
+| **Category** | **First-class taxonomy entity.** A `categories` collection is allowed. **Destination → Category is MANY-TO-MANY via `categoryIds[]`.** Destination must **not** be frozen to a singular `categoryId`, and uncontrolled free-text category values must **not** be the canonical relationship. The canonical taxonomy is administered through Category. |
+| **District** | **First-class canonical geographic entity.** A `districts` collection is allowed. **Destination → District is 1:1 via `districtId`.** A free-form `region` string is **not** the canonical relationship; the §51.2 interim proposal is **withdrawn** (§51.2). District is part of the core destination/content hierarchy, supporting future destination filtering, district-level discovery, internal linking and SEO/AEO/GEO. |
+
+> **Scope boundary (not deferred, just separate).** §42 hotels and §49 blog posts currently carry a `category` **string**. Migrating those to `categoryId`/`categoryIds` is a **separate, explicitly approved** decision and is **not** performed automatically.
+
+### 200.4 Trip Detail field-level contract
+
+| | |
+|---|---|
+| **Status** | **UNRESOLVED — blocks Trip/Itinerary implementation (Phase 3).** |
+| **Issue** | §185–§194 define *which structured areas* a Trip supports and their relationships, but deliberately do **not** fix field names, Firestore sub-document boundaries, or how much content is embedded vs. referenced. §53 remains a pre-v1.4 baseline and is insufficient (§53 note). |
+| **Decision needed** | The canonical Trip Detail contract: field names, itinerary collection/sub-collection layout, validation rules, and which content is derived rather than stored. Required **before** dispatching the Backend Agent (§161). |
+| **Interim position (proposed, not approved)** | Keep §185 as the capability contract. Do not let the Backend Agent choose field names. |
+
+### 200.5 Pickup/drop inheritance
+
+| | |
+|---|---|
+| **Status** | **UNRESOLVED.** |
+| **Issue** | §54 `Departure` carries `pickupLocations`, while §185.3 defines trip-level pickup/drop. Whether a departure may override a trip default, or must inherit it, is not settled. |
+
+### 200.6 Public routes for District, Category and Place
+
+| | |
+|---|---|
+| **Status** | **UNRESOLVED — does not block Phase 2 entity work.** |
+| **Issue** | §17 defines `/destinations` and `/destinations/:slug` only. There is no defined route for districts, categories or individual places, although §172/§173 contemplate district-level discovery and internal linking, and §115 places Categories inside Explore. |
+| **Decision needed** | Whether `/districts/:slug`, `/categories/:slug` and `/places/:slug` are public routes, and what their indexability is. |
+
+### 200.7 Accommodation ↔ `hotels` relationship
+
+| | |
+|---|---|
+| **Status** | **UNRESOLVED.** |
+| **Issue** | §190 requires accommodation as an independent, group-dependent concept; §51 has a `hotels` collection and §42 covers hotel management. The link between a trip's accommodation *policy* and a concrete `hotels` record is undefined. |
+
+### 200.8 Remaining field/behaviour questions
+
+> **These are NOT the Guide / Category / District / Place entity decisions.** Those four are **APPROVED** in §200.1–200.3. The items below are narrower field and behaviour questions that remain genuinely open.
+
+| Item | Status | Blocks |
+|---|---|---|
+| Place field-level contract (§200.9) — the entity is approved, its fields are not | UNRESOLVED | Place implementation |
+| `thingsToDo` model — reference the `activities` collection, or destination-local content? | UNRESOLVED | Destination `thingsToDo` |
+| `relatedDestinations` — explicit links, or derived by shared district/category? | UNRESOLVED | Destination related content |
+| Slug change behaviour after publish (allow? redirect?) | UNRESOLVED | Destination lifecycle |
+| `featured` ordering — boolean or ranked? | UNRESOLVED | Homepage rail |
+| Search mechanics for §68 ("V1 search: destinations, trips, blog") | UNRESOLVED | Public search |
+| Hotel/Blog `category` string → reference migration | UNRESOLVED (explicitly out of scope of §200.3) | Taxonomy consistency |
+
+### 200.9 Place field-level contract
+
+| | |
+|---|---|
+| **Status** | **UNRESOLVED — blocks Place implementation.** |
+| **Issue** | The Place **entity** is approved (§200.2), but its field list is not. Location coordinates, boundary data, opening hours, ticketing, multilingual name and similar tourism attributes have **no PRD support** and must not be invented. |
+| **Decision needed** | Minimum Place field set, and whether a Place has its own public page. |
+
+### 200.10 Historical/cultural content structure
+
+| | |
+|---|---|
+| **Status** | **UNRESOLVED — does not block Phase 2 or Phase 3.** |
+| **Issue** | §187 establishes that this Trip content area exists, is separate from operational booking data, and must be attribution-ready. Its field structure and editorial/verification workflow are not specified, and are not required to begin Destination or Trip/Itinerary work. |
+
+### 200.11 Out of scope for v1.5
+
+The following were **not** changed by v1.5 and remain owned elsewhere: pricing rules (§103, §104), cancellation policy (§48), booking state machine (§55, §76), payment/Razorpay (§12–§13, §58), and private-trip proposals (§56, §57). No rule in those areas is modified, restated or invented by this version.
