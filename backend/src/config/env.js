@@ -19,14 +19,29 @@ const REQUIRED_IN_PRODUCTION = [
 const nodeEnv = process.env.NODE_ENV || 'development';
 const isProduction = nodeEnv === 'production';
 
+/**
+ * Reads an environment variable, optionally with a development-only default.
+ *
+ * A `fallback` is a convenience for local development. It is deliberately
+ * never applied in production: if the variable is unset or empty in
+ * production this throws, so a missing secret can never silently degrade
+ * into a hardcoded development default. (The insecure JWT dev defaults
+ * below are therefore safe — they are unreachable in production.)
+ */
 function requireEnv(name, fallback) {
-  const value = process.env[name] ?? fallback;
-  if ((value === undefined || value === '') && isProduction) {
-    throw new Error(
-      `Missing required environment variable "${name}". Refusing to start in production without it.`
-    );
+  const raw = process.env[name];
+  const isBlank = raw === undefined || raw === null || String(raw).trim() === '';
+
+  if (isBlank) {
+    if (isProduction) {
+      throw new Error(
+        `Missing required environment variable "${name}". Refusing to start in production without it.`
+      );
+    }
+    return fallback;
   }
-  return value;
+
+  return raw;
 }
 
 const env = {
@@ -50,6 +65,11 @@ const env = {
     projectId: process.env.FIREBASE_PROJECT_ID || undefined,
     serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || undefined,
     serviceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || undefined,
+    // Local Firestore emulator. When this is set, the SDK connects to the
+    // emulator instead of a real project and no service-account credential
+    // is required. Never set this in production — it is a plain
+    // host:port with no authentication.
+    emulatorHost: process.env.FIRESTORE_EMULATOR_HOST || undefined,
   },
 
   jwt: {
@@ -77,6 +97,14 @@ const env = {
 if (isProduction) {
   for (const key of REQUIRED_IN_PRODUCTION) {
     requireEnv(key);
+  }
+  // The emulator is unauthenticated, so it is never acceptable in
+  // production regardless of how the other credentials are configured.
+  if (env.firebase.emulatorHost) {
+    throw new Error(
+      'FIRESTORE_EMULATOR_HOST is set. The Firestore emulator is unauthenticated and must ' +
+        'never be used in production. Refusing to start.'
+    );
   }
   if (!env.firebase.serviceAccountJson && !env.firebase.serviceAccountPath) {
     throw new Error(

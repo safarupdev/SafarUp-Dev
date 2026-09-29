@@ -11,22 +11,22 @@
  * false`, so this module enforces the same guarantee in code: every read
  * helper strips sensitive fields before returning a plain user object,
  * and callers that genuinely need the hash/tokens (login, password reset)
- * use the `*WithSecrets` variants explicitly, mirroring the previous
- * Mongoose `.select('+passwordHash')` opt-in pattern.
+ * pass `{ includeSecrets: true }` explicitly.
  *
- * Additional fields beyond the PRD's list (kept from the original
- * implementation — see git history — for the same security reasons):
+ * Additional fields beyond the PRD's list (carried over from the
+ * pre-migration implementation for the same security reasons):
  *   - passwordResetExpires / emailVerificationExpires: tokens without an
  *     expiry are not safe to trust.
  *   - tokenVersion: incremented on password change / "log out everywhere",
  *     instantly invalidating every previously issued refresh token.
  *
- * Firestore has no native unique-index constraint like MongoDB, so
- * email uniqueness is enforced at the application layer: the document ID
- * IS the lowercased email address. This makes "does this email exist" a
- * single point lookup (no query needed) and makes a duplicate email
- * structurally impossible to create by construction, not by a race-prone
- * "check then insert".
+ * Email uniqueness is enforced at the application layer: the document ID
+ * IS the lowercased email address, which turns "does this email exist"
+ * into a single point lookup with no query. Keying alone is not sufficient
+ * to make duplicates impossible, though — two concurrent `set()` calls on
+ * the same ID would silently overwrite each other — so `create()` performs
+ * its existence check and its write inside a Firestore transaction. See
+ * that function for the concurrency argument.
  */
 
 const { getFirestore } = require('../config/database');
@@ -45,6 +45,44 @@ const SECRET_FIELDS = Object.freeze([
   'tokenVersion',
 ]);
 
+/**
+ * Date fields held in the user document.
+ *
+ * Firestore returns Timestamp instances, which are not Date instances:
+ * they lack getTime(), and JSON.stringify renders them as
+ * `{_seconds, _nanoseconds}` rather than an ISO string. Normalising them
+ * to Date at the model boundary means callers get a consistent type
+ * (services compare against `new Date()`, and the API serialises cleanly).
+ */
+const DATE_FIELDS = Object.freeze([
+  'createdAt',
+  'updatedAt',
+  'lastLoginAt',
+  'emailVerificationExpires',
+  'passwordResetExpires',
+]);
+
+/**
+ * Converts Firestore Timestamps to Date. Also accepts Date, ISO strings
+ * and epoch values so documents written by other tooling still load.
+ */
+function toDate(value) {
+  if (!value) return value;
+  if (value instanceof Date) return value;
+  if (typeof value.toDate === 'function') return value.toDate();
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value);
+  return value;
+}
+
+function normalizeDates(data) {
+  for (const field of DATE_FIELDS) {
+    if (data[field] !== undefined && data[field] !== null) {
+      data[field] = toDate(data[field]);
+    }
+  }
+  return data;
+}
+
 function docId(email) {
   return email.trim().toLowerCase();
 }
@@ -60,15 +98,38 @@ function stripSecrets(data) {
 
 function toUser(snapshot, { includeSecrets = false } = {}) {
   if (!snapshot.exists) return null;
-  const data = snapshot.data();
+  const data = normalizeDates({ ...snapshot.data() });
   const base = { _id: snapshot.id, id: snapshot.id, ...data };
   return includeSecrets ? base : stripSecrets(base);
 }
 
 /**
- * @param {object} fields Must include `email`; `role`, `authProvider`,
- *   `emailVerified`, `status` default to safe values matching the
- *   Mongoose schema's previous defaults.
+ * @param {object} fields Must include `email`. `role`, `authProvider`,
+ *   `emailVerified` and `status` default to the same safe values the
+ *   pre-migration schema used.
+ */
+function duplicateEmailError() {
+  // Carries code 11000 so middleware/errorHandler.js maps it to a 409
+  // "record already exists" without any change to that translation logic.
+  const error = new Error('A user with this email already exists');
+  error.code = 11000;
+  return error;
+}
+
+/**
+ * Creates a user document, atomically.
+ *
+ * The existence check and the write happen inside a single Firestore
+ * transaction. A read-then-write outside a transaction would let two
+ * concurrent registrations for the same email both observe "does not
+ * exist" and both proceed — and because the document ID *is* the email,
+ * the second `set()` would silently overwrite the first account,
+ * including its passwordHash and tokenVersion. Firestore retries
+ * conflicting transactions internally, so after a retry the loser sees
+ * the winner's document and aborts instead of clobbering it.
+ *
+ * The document-ID strategy is unchanged: the ID remains the lowercased
+ * email address.
  */
 async function create(fields) {
   if (!fields.email) {
@@ -76,17 +137,6 @@ async function create(fields) {
   }
   const id = docId(fields.email);
   const db = getFirestore();
-  const ref = db.collection(COLLECTION).doc(id);
-
-  const existing = await ref.get();
-  if (existing.exists) {
-    // Mirrors Mongoose's unique-index violation (err.code === 11000)
-    // so the existing errorHandler.js translation logic keeps working
-    // unchanged.
-    const error = new Error('A user with this email already exists');
-    error.code = 11000;
-    throw error;
-  }
 
   const now = new Date();
   const document = {
@@ -109,8 +159,20 @@ async function create(fields) {
     updatedAt: now,
   };
 
-  await ref.set(document);
-  return toUser({ id, exists: true, data: () => document }, { includeSecrets: true });
+  return db.runTransaction(async (transaction) => {
+    const ref = db.collection(COLLECTION).doc(id);
+    const existing = await transaction.get(ref);
+
+    if (existing.exists) {
+      // Abort before any write, so the existing account — including its
+      // passwordHash, tokenVersion and any active verification/reset
+      // token — is left completely untouched.
+      throw duplicateEmailError();
+    }
+
+    transaction.set(ref, document);
+    return toUser({ id, exists: true, data: () => document }, { includeSecrets: true });
+  });
 }
 
 /**
@@ -139,8 +201,7 @@ async function findOne(query, options = {}) {
 
 /**
  * Token lookups additionally require the associated expiry to still be in
- * the future — mirrors the previous Mongoose query shape
- * `{ token: hash, tokenExpires: { $gt: new Date() } }`.
+ * the future, so an expired token is treated exactly as "not found".
  */
 async function findOneByUnexpiredToken(tokenField, expiresField, tokenValue) {
   const db = getFirestore();
@@ -167,8 +228,8 @@ async function findById(id, options = {}) {
 }
 
 /**
- * Partial update — mirrors calling `.save()` after mutating a Mongoose
- * document. Always stamps `updatedAt`.
+ * Partial update via a merge, so unspecified fields are preserved. Always
+ * stamps `updatedAt`.
  */
 async function updateById(id, patch) {
   const db = getFirestore();

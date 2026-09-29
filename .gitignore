@@ -28,3 +28,9 @@ Thumbs.db
 
 # Testing / coverage
 coverage/
+
+# Firebase emulator artefacts (created by `firebase emulators:start`)
+*-debug.log
+.firebase/
+ui-debug.log
+firebase-debug.log

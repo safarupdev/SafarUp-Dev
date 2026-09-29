@@ -1,8 +1,8 @@
 {
-  "name": "sakala",
+  "name": "safarup",
   "private": true,
   "version": "0.1.0",
-  "description": "Sakala monorepo: backend, public, admin",
+  "description": "SafarUp monorepo: backend, public, admin",
   "workspaces": [
     "backend",
     "public",
@@ -13,6 +13,13 @@
     "dev:public": "npm run dev --workspace=public",
     "dev:admin": "npm run dev --workspace=admin",
     "build:public": "npm run build --workspace=public",
-    "build:admin": "npm run build --workspace=admin"
+    "build:admin": "npm run build --workspace=admin",
+    "build": "npm run build:public && npm run build:admin",
+    "lint": "npm run lint --workspace=backend && npm run lint --workspace=admin && npm run lint --workspace=public",
+    "test": "npm run test --workspace=backend",
+    "emulators": "npm run emulators --workspace=backend"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

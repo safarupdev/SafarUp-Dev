@@ -11,11 +11,32 @@
  * Authentication to Firebase stays custom (JWT + bcrypt, PRD §30) — this
  * module only initializes the Firebase Admin SDK so the backend can read
  * and write Firestore documents. It does NOT use Firebase Authentication.
+ *
+ * Local development can point at the Firestore emulator instead of a real
+ * project by setting FIRESTORE_EMULATOR_HOST (see firebase.json for the
+ * matching emulator ports). The emulator is unauthenticated, so
+ * config/env.js refuses to start the server if that variable is set while
+ * NODE_ENV=production.
  */
 
 const admin = require('firebase-admin');
 const env = require('./env');
 const logger = require('../utils/logger');
+
+// The Admin SDK requires *some* credential object. When talking to the
+// emulator there is nothing real to sign with, so credential.cert() is
+// deliberately not used here: it parses the private key strictly and
+// would reject a placeholder. applicationDefault() satisfies the SDK
+// without parsing a key at all, and grants nothing because the emulator
+// does not authenticate. Config/env.js separately refuses to boot in
+// production when the emulator is enabled.
+// The local Firestore emulator is started as this project ID
+// (`npm run emulators` → `firebase emulators:start --only firestore
+// --project safarup-dev`). The SDK must address the SAME project, or data
+// written by the emulator and data read by the SDK land in different
+// projects. Keep this value in step with that script and with
+// firebase.json. Override with FIREBASE_PROJECT_ID when needed.
+const EMULATOR_PROJECT_ID = 'safarup-dev';
 
 let app = null;
 let firestore = null;
@@ -35,7 +56,7 @@ function loadServiceAccount() {
   // Alternative: a path to a downloaded service account key file (common
   // for local development). Never commit this file — see .gitignore.
   if (env.firebase.serviceAccountPath) {
-    // eslint-disable-next-line global-require, import/no-dynamic-require
+    // eslint-disable-next-line global-require
     return require(env.firebase.serviceAccountPath);
   }
 
@@ -47,13 +68,22 @@ async function connectDatabase() {
     return firestore;
   }
 
-  const serviceAccount = loadServiceAccount();
+  const usingEmulator = Boolean(env.firebase.emulatorHost);
 
-  if (!serviceAccount && !env.isProduction) {
-    // Local/dev convenience: if GOOGLE_APPLICATION_CREDENTIALS is set, or
-    // the Firebase emulator suite is running, admin.initializeApp() with
-    // just a projectId can still work. We surface a clear error instead
-    // of silently connecting to nothing.
+  if (usingEmulator) {
+    // The Admin SDK reads FIRESTORE_EMULATOR_HOST to route Firestore
+    // traffic to the local emulator. The emulator accepts any credential,
+    // so a dummy is supplied to skip service-account discovery entirely.
+    // env.js refuses to boot in production when this variable is set.
+    process.env.FIRESTORE_EMULATOR_HOST = env.firebase.emulatorHost;
+  }
+
+  const serviceAccount = usingEmulator ? null : loadServiceAccount();
+
+  if (!usingEmulator && !serviceAccount && !env.isProduction) {
+    // Local/dev convenience: if GOOGLE_APPLICATION_CREDENTIALS is set,
+    // admin.initializeApp() with just a projectId can still work. We
+    // surface a clear error instead of silently connecting to nothing.
     if (!env.firebase.projectId) {
       throw new Error(
         'No Firebase credentials configured. Set FIREBASE_SERVICE_ACCOUNT_JSON, ' +
@@ -69,19 +99,24 @@ async function connectDatabase() {
           credential: serviceAccount
             ? admin.credential.cert(serviceAccount)
             : admin.credential.applicationDefault(),
-          projectId: env.firebase.projectId || serviceAccount?.project_id,
+          projectId: env.firebase.projectId || serviceAccount?.project_id || EMULATOR_PROJECT_ID,
         });
 
   firestore = admin.firestore();
   firestore.settings({ ignoreUndefinedProperties: true });
 
   // Firestore has no explicit "connect" call — this is a lightweight
-  // reachability check so the server can fail fast on boot (matching the
-  // previous MongoDB behavior) instead of only discovering a bad
-  // credential/project ID on the first real request.
-  await firestore.collection('__healthcheck__').limit(1).get();
+  // reachability check so the server can fail fast on boot instead of only
+  // discovering a bad credential/project ID on the first real request.
+  // The collection name must avoid Firestore's reserved `__`-prefixed
+  // collection IDs, otherwise the probe itself is rejected.
+  await firestore.collection('healthcheck').limit(1).get();
 
-  logger.info(`Firestore connected [project: ${app.options.projectId || 'unknown'}]`);
+  logger.info(
+    usingEmulator
+      ? `Firestore connected [emulator: ${env.firebase.emulatorHost}]`
+      : `Firestore connected [project: ${app.options.projectId || 'unknown'}]`
+  );
 
   return firestore;
 }

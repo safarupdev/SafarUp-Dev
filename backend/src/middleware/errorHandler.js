@@ -21,8 +21,8 @@ function errorHandler(err, req, res, _next) {
 
   if (!(err instanceof ApiError)) {
     // models/User.model.js throws this shape (err.code === 11000) for a
-    // duplicate email, mirroring the previous Mongoose unique-index error
-    // so this translation still applies unchanged.
+    // duplicate email, so this translation covers the user-creation
+    // conflict case as well as any future Firestore-side constraint error.
     if (err?.code === 11000) {
       apiError = ApiError.conflict('A record with these details already exists');
     } else {

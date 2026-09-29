@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// Deny-by-default client policy.
+//
+// SafarUp's backend is the only component that talks to Firestore. It
+// connects with the Firebase Admin SDK using server-side service-account
+// credentials, which bypass these rules entirely.
+//
+// No browser client should ever reach Firestore directly, so every request
+// from a client SDK is denied. This is intentional defence in depth: the
+// real access control lives in Express middleware (PRD §63), and this file
+// exists so that shipping a client-side Firebase config by mistake cannot
+// turn the database into a public one.
+//
+// If a client-side component is ever given legitimate access, grant the
+// narrowest rule possible for that specific path here — never a blanket
+// allow.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

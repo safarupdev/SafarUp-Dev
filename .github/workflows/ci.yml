@@ -1,0 +1,72 @@
+name: CI
+
+# PRD §97 (CI/CD): "Every PR: Install -> Lint -> Typecheck -> Unit tests -> Build".
+# There is no TypeScript in this repository (JavaScript only, per the ADR), so
+# the typecheck step is intentionally absent rather than faked.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint, Test, Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Single install for the whole npm-workspaces monorepo.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # The backend suite runs against the Firestore emulator (firebase.json).
+      # Start it as a background process and wait for it to accept
+      # connections before handing over to vitest.
+      - name: Start Firestore emulator
+        run: |
+          npx --yes firebase-tools@13 emulators:start \
+            --only firestore \
+            --project safarup-dev \
+            > "$RUNNER_TEMP/firestore-emulator.log" 2>&1 &
+
+          echo "Waiting for the Firestore emulator on 127.0.0.1:8080..."
+          for i in $(seq 1 60); do
+            if curl -s --max-time 2 "http://127.0.0.1:8080/" > /dev/null 2>&1; then
+              echo "Emulator is up after ${i}s."
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "::error::Firestore emulator did not start in time"
+          cat "$RUNNER_TEMP/firestore-emulator.log"
+          exit 1
+
+      - name: Test (backend)
+        run: npm run test
+
+      # Surfaced for debugging when a backend test fails.
+      - name: Emulator log on failure
+        if: failure()
+        run: cat "$RUNNER_TEMP/firestore-emulator.log"
+
+      - name: Build admin
+        run: npm run build:admin
+
+      - name: Build public
+        run: npm run build:public
