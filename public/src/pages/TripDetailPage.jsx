@@ -387,8 +387,7 @@ const canonical = IS_SHOWCASE ? null : joinUrl(SITE_URL, PATHS.trips, trip.slug)
               as="link"
               to={PATHS.planTrip}
               size="lg"
-              variant="secondary"
-              className="bg-transparent text-white ring-white/30 hover:bg-white/10"
+              variant="onDark"
             >
               Ask a question
             </Button>

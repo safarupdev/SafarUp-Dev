@@ -533,9 +533,8 @@ export default function DestinationDetailPage() {
                   <Button
                     as="link"
                     to={PATHS.planTrip}
-                    variant="secondary"
+                    variant="onDark"
                     size="lg"
-                    className="bg-transparent text-white ring-white/30 hover:bg-white/10"
                   >
                     Plan a Private Trip
                   </Button>

@@ -366,8 +366,7 @@ export default function AboutPage() {
               as="link"
               to={PATHS.planTrip}
               size="lg"
-              variant="secondary"
-              className="bg-transparent text-white ring-white/30 hover:bg-white/10"
+              variant="onDark"
             >
               Plan a Private Trip
             </Button>

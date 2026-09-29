@@ -383,8 +383,14 @@ function ExploreHero({ term, onTermChange, destinationCount, loading }) {
             <span className="measure">
               {loading
                 ? 'Search matches the journeys published on this page and the destinations SafarUp has loaded. Full-text search across the whole catalogue is not available yet.'
-                : `Search matches the journeys published on this page and the ${destinationCount} destination${
-                    destinationCount === 1 ? '' : 's'
+                : // The count is dropped when it is zero. Interpolating it anyway
+                  // rendered the sentence as "the 0 destinations SafarUp has
+                  // loaded", which reads as a broken catalogue rather than an
+                  // honest statement about search scope.
+                  `Search matches the journeys published on this page and the ${
+                    destinationCount > 0
+                      ? `${destinationCount} destination${destinationCount === 1 ? '' : 's'}`
+                      : 'destinations'
                   } SafarUp has loaded. Full-text search across the whole catalogue is not available yet.`}
             </span>
           </p>

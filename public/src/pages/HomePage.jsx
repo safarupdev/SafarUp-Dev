@@ -281,8 +281,7 @@ export default function HomePage() {
               as="link"
               to={PATHS.planTrip}
               size="lg"
-              variant="secondary"
-              className="bg-transparent text-white ring-white/30 hover:bg-white/10"
+              variant="onDark"
             >
               Plan a private trip
             </Button>
@@ -708,8 +707,7 @@ export default function HomePage() {
               as="link"
               to={PATHS.planTrip}
               size="lg"
-              variant="secondary"
-              className="bg-transparent text-white ring-white/30 hover:bg-white/10"
+              variant="onDark"
             >
               Talk to us
             </Button>

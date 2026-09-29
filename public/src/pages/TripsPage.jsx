@@ -369,8 +369,7 @@ export default function TripsPage() {
               as="link"
               to={PATHS.destinations}
               size="lg"
-              variant="secondary"
-              className="bg-transparent text-white ring-white/30 hover:bg-white/10"
+              variant="onDark"
             >
               Browse destinations
             </Button>

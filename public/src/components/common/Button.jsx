@@ -21,6 +21,20 @@ const VARIANTS = {
   secondary:
     'bg-white text-navy-900 ring-1 ring-inset ring-navy-200 shadow-sm hover:bg-navy-50 active:bg-navy-100 disabled:text-navy-500',
   ghost: 'text-brand-700 hover:bg-navy-50 active:bg-navy-100 disabled:text-navy-500',
+  // Secondary CTA on a dark surface (hero, footer CTA band).
+  //
+  // This exists because pages used to reach for `variant="secondary"` plus a
+  // `className` of `bg-transparent text-white ring-white/30`. That silently
+  // broke: `secondary` already sets `bg-white` and `text-navy-900`, and
+  // Tailwind resolves two competing `background-color`/`color` utilities by
+  // STYLESHEET order, not by the order they appear in `className`. The result
+  // was `bg-white` winning the background while `text-white` won the text —
+  // a solid white pill with white text, i.e. an invisible label on the two
+  // most important CTAs on the site. Callers must not be able to reach that
+  // state by overriding `secondary`, so the dark-surface treatment is its own
+  // variant instead of a set of overrides.
+  onDark:
+    'bg-transparent text-white ring-1 ring-inset ring-white/45 hover:bg-white/10 hover:ring-white/70 active:bg-white/15 focus-visible:ring-white',
 };
 
 const SIZES = {
