@@ -14,7 +14,7 @@
  * count that the day-by-day plan does not actually contain.
  */
 
-import { tripLocationClusters, tripRouteDescription, tripRouteSummary } from '../../data/showcase';
+import { tripLocationClusters, tripRouteSummary } from '../../data/showcase';
 import RouteLine from './RouteLine';
 import Icon from '../common/Icon';
 
@@ -43,15 +43,32 @@ export default function JourneyAtAGlance({ trip, className = '' }) {
         <p className="text-sm font-semibold text-navy-600">{tripRouteSummary(trip)}</p>
       </div>
 
-      <p className="sr-only">{tripRouteDescription(trip)}</p>
+      {/* No `sr-only` route text here: the `RouteLine` rendered immediately
+          below already carries the accessible route, and a screen reader heard
+          the same sentence twice on this band. */}
 
       <div className="mt-4">
         <RouteLine route={trip.route} size="md" />
       </div>
 
       <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {clusters.map((cluster) => {
-          const leg = trip.route.find((entry) => entry.name === cluster.location);
+        {clusters.map((cluster, clusterIndex) => {
+          /**
+           * `route.find()` by name returned the FIRST matching leg, so a loop
+           * route (Jamui -> Simultala -> Jamui) always reported START and the
+           * RETURN leg never surfaced — the journey's most reassuring fact,
+           * "you end where you started", was invisible.
+           *
+           * Clusters are walked in route order, so the LAST leg for a given
+           * location is the strongest claim: return beats overnight beats
+           * start.
+           */
+          const legs = trip.route.filter((entry) => entry.name === cluster.location);
+          const leg =
+            legs.find((entry) => entry.role === 'return') ??
+            legs.find((entry) => entry.role === 'overnight') ??
+            legs[clusterIndex] ??
+            legs[0];
           const isOvernight = leg?.role === 'overnight';
           const isStart = leg?.role === 'start';
           const isReturn = leg?.role === 'return';
@@ -90,7 +107,7 @@ export default function JourneyAtAGlance({ trip, className = '' }) {
 
               {isOvernight || isStart || isReturn ? (
                 <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-accent-700">
-                  {ROLE_LABEL[leg.role]}
+                  {leg ? ROLE_LABEL[leg.role] : null}
                 </p>
               ) : null}
             </div>
@@ -99,7 +116,7 @@ export default function JourneyAtAGlance({ trip, className = '' }) {
       </dl>
 
       <p className="mt-5 flex items-center gap-2 border-t border-navy-100 pt-4 text-sm text-navy-600">
-        <Icon name="clock" className="h-4 w-4 flex-none text-navy-400" />
+        <Icon name="clock" className="h-4 w-4 flex-none text-navy-500" />
         <span>
           {trip.duration}
           {nights > 0

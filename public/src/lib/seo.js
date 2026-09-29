@@ -128,7 +128,14 @@ export function useSeo({
     clearStructuredData();
     if (structuredData) {
       const blocks = Array.isArray(structuredData) ? structuredData : [structuredData];
-      addStructuredData(blocks.length === 1 ? blocks[0] : { '@context': 'https://schema.org', '@graph': blocks });
+      // An empty array is truthy, so without this a page that deliberately
+      // suppresses its structured data (showcase journeys return `[]`) still
+      // emitted a malformed empty `@graph`.
+      if (blocks.length > 0) {
+        addStructuredData(
+          blocks.length === 1 ? blocks[0] : { '@context': 'https://schema.org', '@graph': blocks }
+        );
+      }
     }
 
     // Structured data belongs to one route only; leaving it behind would let a

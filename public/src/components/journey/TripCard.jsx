@@ -17,7 +17,7 @@
 
 import { Link } from 'react-router-dom';
 
-import { HERO_IMAGES, tripPlaceCount, tripRouteSummary } from '../../data/showcase';
+import { HERO_IMAGES, IS_SHOWCASE, tripPlaceCount } from '../../data/showcase';
 import { tripPath } from '../../constants/routes';
 import SmartImage from '../common/SmartImage';
 import Icon from '../common/Icon';
@@ -88,7 +88,9 @@ export default function TripCard({ trip, priority = 'default' }) {
           <RouteLine route={trip.route} size="sm" />
         </div>
 
-        <p className="sr-only">Route: {tripRouteSummary(trip)}</p>
+        {/* The `RouteLine` above already exposes the route to assistive tech
+            (its own `sr-only` text, which is role-aware). This second copy made
+            every card announce the route twice. */}
 
         <div className="mt-4 flex flex-wrap gap-1.5">
           <MetaPill>{places} places</MetaPill>
@@ -103,10 +105,19 @@ export default function TripCard({ trip, priority = 'default' }) {
           <Icon name="arrowRight" className="h-4 w-4 flex-none text-accent-700" />
         </div>
 
-        {/* Demo status, on the card itself. */}
-        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-navy-400">
-          Example journey
-        </p>
+        {/*
+          Demo status, on the card itself.
+          Gated on `IS_SHOWCASE` so the "single switch" is genuinely single:
+          flipping it must not leave the header and footer telling visitors the
+          itineraries are unpublished while `/trips` quietly became indexable
+          and bookable-looking. That disagreement is the same UI-vs-metadata
+          contradiction the noindex work exists to prevent.
+        */}
+        {IS_SHOWCASE ? (
+          <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-navy-500">
+            Example journey
+          </p>
+        ) : null}
       </div>
     </article>
   );

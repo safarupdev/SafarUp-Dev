@@ -15,17 +15,32 @@ import { Link } from 'react-router-dom';
 
 export default function StickyActionBar({ to, label, hint }) {
   return (
+    /*
+     * The wrapper is `inset-x-0`, transparent and `pointer-events-none`: it
+     * spans the area behind the floating nav only to reserve vertical space, so
+     * it must not paint there. Painting it white turned the nav's 16px gutters
+     * from page content into a white plinth with a full-width hairline cutting
+     * across — the exact opposite of the nav floating above the content, which
+     * is the single most distinctive mobile decision in the app.
+     *
+     * The visible bar is its own inset pill that stops ABOVE the nav
+     * (`bottom-[calc(...)]`) and never extends under it.
+     */
     <div
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-navy-100 bg-white/95 px-4 py-2.5 shadow-nav backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-30 sm:hidden"
       // Reserve exactly the height of the bottom navigation so this bar rests
-      // on top of it rather than under it.
+      // on top of it rather than under it. These must stay equal to
+      // `spacing.floating-nav` + `spacing.floating-nav-gap`, the same two tokens
+      // `.pb-nav-clearance` derives from in index.css.
       style={{ paddingBottom: 'calc(4.5rem + env(safe-area-inset-bottom, 0px) + 0.625rem)' }}
     >
-      <div className="mx-auto flex max-w-shell items-center gap-3">
-        {hint ? <p className="min-w-0 flex-1 text-xs leading-tight text-navy-600">{hint}</p> : null}
+      <div className="pointer-events-auto mx-3 mb-2 flex items-center gap-3 rounded-full border border-navy-100 bg-white/95 p-2 pl-4 shadow-nav backdrop-blur supports-[backdrop-filter]:bg-white/90">
+        {hint ? (
+          <p className="min-w-0 flex-1 truncate text-xs leading-tight text-navy-600">{hint}</p>
+        ) : null}
         <Link
           to={to}
-          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-accent-600 px-5 text-[0.95rem] font-semibold text-white shadow-sm transition-colors duration-150 ease-standard hover:bg-accent-700 active:bg-accent-800"
+          className="inline-flex min-h-11 flex-none items-center justify-center rounded-full bg-accent-700 px-5 text-[0.95rem] font-semibold text-white shadow-sm transition-colors duration-150 ease-standard hover:bg-accent-800 active:bg-accent-900"
         >
           {label}
         </Link>

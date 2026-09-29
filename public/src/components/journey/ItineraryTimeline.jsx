@@ -30,10 +30,21 @@ const STOP_ROLE_LABEL = {
   return: 'Return and drop',
 };
 
-function stopRole(stop) {
-  if (stop.overnight) return 'overnight';
-  const name = stop.name.toLowerCase();
-  if (name.includes('departure point') || name.includes('return and drop')) return 'return';
+/**
+ * A stop's role comes from the DAY it sits in, not from its own text.
+ *
+ * The previous version substring-matched English prose on `stop.name`, which
+ * meant it fired on roughly one stop in thirty-two, could never match the
+ * phrases it was looking for (they live in `stop.description`, not `name`), and
+ * would throw a TypeError on an unnamed stop. The itinerary already states the
+ * facts structurally: the first stop is at the day's start location, the last
+ * ends at the day's end location, and `stop.overnight` marks the sleep.
+ */
+function stopRole(stop, day, index, isLastStop) {
+  if (stop?.overnight) return 'overnight';
+  const name = stop?.name ?? '';
+  if (name === day?.startLocation) return 'start';
+  if (isLastStop && name === day?.endLocation) return 'return';
   return null;
 }
 
@@ -113,13 +124,26 @@ export default function ItineraryTimeline({ trip, defaultExpandedDays = [1] }) {
                 </button>
 
                 <div id={panelId} hidden={!isOpen} className="mt-3 pl-1">
-                  <p className="font-display text-base font-bold text-navy-900">{day.title}</p>
+                  {/* An `<h3>`, not a styled `<p>`: the day title was styled as
+                      a heading but exposed as body text, so navigating by
+                      heading skipped every day in the flagship section. */}
+                  <h3 className="font-display text-base font-bold text-navy-900">
+                    {day.title}
+                  </h3>
 
                   <div className="mt-3 space-y-2.5">
-                    {day.stops?.map((stop) => {
-                      const role = stopRole(stop);
+                    {(day.stops ?? []).map((stop, stopIndex) => {
+                      const role = stopRole(
+                        stop,
+                        day,
+                        stopIndex,
+                        stopIndex === (day.stops?.length ?? 0) - 1
+                      );
                       return (
-                        <div key={stop.name} className="flex items-start gap-3">
+                        <div
+                          key={stop?.name ?? `stop-${stopIndex}`}
+                          className="flex items-start gap-3"
+                        >
                           <span
                             aria-hidden="true"
                             className={`mt-2 h-1.5 w-1.5 flex-none rounded-full ${
@@ -144,7 +168,7 @@ export default function ItineraryTimeline({ trip, defaultExpandedDays = [1] }) {
 
                   {day.meals?.length ? (
                     <p className="mt-4 flex items-center gap-2 text-sm text-navy-600">
-                      <Icon name="sparkle" className="h-4 w-4 flex-none text-navy-400" />
+                      <Icon name="sparkle" className="h-4 w-4 flex-none text-navy-500" />
                       {day.meals.join(' · ')}
                     </p>
                   ) : null}

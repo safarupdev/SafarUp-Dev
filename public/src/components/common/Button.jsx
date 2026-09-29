@@ -19,8 +19,8 @@ const VARIANTS = {
   // brand-600 #1d4ed8 on white is 6.70:1 — passes AA, unchanged.
   brand: 'bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-700 disabled:bg-navy-200 disabled:text-navy-500',
   secondary:
-    'bg-white text-navy-900 ring-1 ring-inset ring-navy-200 shadow-sm hover:bg-navy-50 active:bg-navy-100 disabled:text-navy-400',
-  ghost: 'text-brand-700 hover:bg-navy-50 active:bg-navy-100 disabled:text-navy-400',
+    'bg-white text-navy-900 ring-1 ring-inset ring-navy-200 shadow-sm hover:bg-navy-50 active:bg-navy-100 disabled:text-navy-500',
+  ghost: 'text-brand-700 hover:bg-navy-50 active:bg-navy-100 disabled:text-navy-500',
 };
 
 const SIZES = {

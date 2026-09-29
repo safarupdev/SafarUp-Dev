@@ -26,7 +26,7 @@ export default function NotFoundPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 px-4 py-24 text-center sm:px-6">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-navy-50 text-navy-400 ring-1 ring-navy-100">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-navy-50 text-navy-500 ring-1 ring-navy-100">
         <Icon name="compass" className="h-7 w-7" />
       </span>
       <div className="space-y-3">

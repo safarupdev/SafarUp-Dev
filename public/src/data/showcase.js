@@ -592,10 +592,15 @@ export function tripLocationClusters(trip) {
     const cluster = byLocation.get(location);
     cluster.days.push(day.day);
 
-    for (const stop of day.stops ?? []) {
-      if (waypoints.has(stop.name)) continue;
-      if (cluster.places.some((place) => place.name === stop.name)) continue;
-      cluster.places.push({ name: stop.name, description: stop.description });
+    for (const [stopIndex, stop] of (day.stops ?? []).entries()) {
+      // The day's own location and the hand-off to the next one are waypoints,
+      // not places; `stop.name` may also be absent on a partial record, so
+      // index it rather than trusting the shape.
+      const name = stop?.name;
+      if (!name) continue;
+      if (waypoints.has(name)) continue;
+      if (cluster.places.some((place) => place.name === name)) continue;
+      cluster.places.push({ name, description: stop.description, order: stopIndex });
     }
   }
 
@@ -617,8 +622,22 @@ export function tripPlaceCount(trip) {
 }
 
 /**
- * The quick-facts strip. Values are derived, never hand-typed, so a journey
- * cannot advertise a duration its own itinerary contradicts.
+ * Nights on the journey, counted from the itinerary rather than read off a
+ * hand-typed `nights` field. The two agreed on all three showcase trips, but
+ * the field was a duplicate that would silently drift the first time a day was
+ * added, and the comment on `tripFacts` claimed values were derived. Use this
+ * so there is exactly one source.
+ */
+export function tripNights(trip) {
+  if (!trip?.itinerary?.length) return 0;
+  return trip.itinerary.filter((day) => day?.overnight).length;
+}
+
+/**
+ * The quick-facts strip. `route`, places and nights are DERIVED from the
+ * journey's own structure, so a journey cannot advertise a fact its itinerary
+ * contradicts. `duration`, `season` and `groupSize` are read from the record as
+ * authored — they are editorial copy, not computable facts.
  */
 export function tripFacts(trip) {
   if (!trip) return [];
@@ -629,11 +648,12 @@ export function tripFacts(trip) {
     { key: 'season', label: 'Season', value: trip.season },
     { key: 'group', label: 'Group size', value: trip.groupSize },
   ];
-  if (trip.nights != null) {
+  if (trip.itinerary?.length) {
+    const nights = tripNights(trip);
     facts.splice(1, 0, {
       key: 'nights',
       label: 'Nights',
-      value: trip.nights === 0 ? 'No overnight' : `${trip.nights} night${trip.nights === 1 ? '' : 's'}`,
+      value: nights === 0 ? 'No overnight' : `${nights} night${nights === 1 ? '' : 's'}`,
     });
   }
   return facts;

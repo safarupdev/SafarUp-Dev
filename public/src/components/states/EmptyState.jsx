@@ -16,7 +16,7 @@ export default function EmptyState({ icon = 'inbox', title, description, action,
     <div
       className={`flex flex-col items-center gap-4 rounded-2xl border border-dashed border-navy-200 bg-navy-50/60 px-6 py-12 text-center ${className}`}
     >
-      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-navy-400 ring-1 ring-navy-100">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-navy-500 ring-1 ring-navy-100">
         <Icon name={icon} className="h-6 w-6" />
       </span>
       <div className="max-w-md space-y-1.5">

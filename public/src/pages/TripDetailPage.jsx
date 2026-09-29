@@ -37,6 +37,7 @@ import {
   findShowcaseTrip,
   tripFacts,
   tripLocationClusters,
+  tripNights,
   tripPlaceCount,
   tripRouteSummary,
 } from '../data/showcase';
@@ -80,7 +81,7 @@ function Section({ id, title, eyebrow, children, className = '' }) {
   return (
     <section id={id} aria-labelledby={`${id}-heading`} className={`py-12 sm:py-14 ${className}`}>
       {eyebrow ? (
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent-600">{eyebrow}</p>
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent-700">{eyebrow}</p>
       ) : null}
       <h2
         id={`${id}-heading`}
@@ -137,7 +138,10 @@ export default function TripDetailPage() {
 }
 
 function TripView({ trip }) {
-  const canonical = joinUrl(SITE_URL, PATHS.trips, trip.slug);
+  // Withdrawn while the itineraries are showcase content: a self-referential
+// canonical next to `noindex,follow` claims an indexable identity this page
+// does not have. Restored automatically when `IS_SHOWCASE` flips.
+const canonical = IS_SHOWCASE ? null : joinUrl(SITE_URL, PATHS.trips, trip.slug);
   const heroImage = HERO_IMAGES[trip.slug];
   const route = trip.route ?? [];
 
@@ -156,7 +160,16 @@ function TripView({ trip }) {
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
         { '@type': 'ListItem', position: 2, name: 'Journeys', item: joinUrl(SITE_URL, PATHS.trips) },
-        { '@type': 'ListItem', position: 3, name: trip.title, item: canonical },
+        // A `null` item would be invalid JSON-LD, so the breadcrumb names the
+        // final step without a URL when the canonical is withdrawn. The
+        // position claim is what a breadcrumb communicates, and that is still
+        // true on a `noindex` page.
+        {
+          '@type': 'ListItem',
+          position: 3,
+          name: trip.title,
+          ...(canonical ? { item: canonical } : {}),
+        },
       ],
     };
 
@@ -191,14 +204,22 @@ function TripView({ trip }) {
         // `itinerary` is an ordered ItemList of the real places this trip
         // covers — each a `Place`. It is not a list of days: typing a day as
         // `TouristAttraction` invents an attraction that does not exist.
+        //
+        // Derived from `tripLocationClusters`, NOT from `placesCovered`. Those
+        // two are not the same list: `placesCovered` is a hand-picked summary
+        // that includes journey waypoints and omits several real stops, so
+        // using it here made the structured data claim 6 places while the page
+        // visibly listed 10. One journey, one source of truth for its stops.
         itinerary: {
           '@type': 'ItemList',
-          numberOfItems: trip.placesCovered.length,
-          itemListElement: trip.placesCovered.map((place, index) => ({
-            '@type': 'ListItem',
-            position: index + 1,
-            item: { '@type': 'Place', name: place.name },
-          })),
+          numberOfItems: tripPlaceCount(trip),
+          itemListElement: tripLocationClusters(trip)
+            .flatMap((cluster) => cluster.places)
+            .map((place, index) => ({
+              '@type': 'ListItem',
+              position: index + 1,
+              item: { '@type': 'Place', name: place.name },
+            })),
         },
         // A single day of a multi-day trip is a `subTrip` — the only correct
         // schema.org shape for "part of this trip". The `subTrip` property
@@ -252,7 +273,10 @@ function TripView({ trip }) {
   const railSummary = [
     ['District', trip.district],
     ['Duration', trip.duration],
-    ['Overnights', trip.nights === 0 ? 'None' : String(trip.nights ?? 0)],
+    // Counted from the itinerary, not `trip.nights ?? 0`: that spelling printed
+    // a confident "0" for a journey whose nights were unknown, while
+    // `tripFacts` correctly omits the row. One fact, one source.
+    ['Overnights', tripNights(trip) === 0 ? 'None' : String(tripNights(trip))],
     ['Places', `${placeCount}`],
     ['Group', trip.groupSize],
   ];
@@ -423,7 +447,7 @@ function TripView({ trip }) {
             hover
             className="flex items-center gap-4"
           >
-            <span className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-accent-50 text-accent-600">
+            <span className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-accent-50 text-accent-700">
               <Icon name="mapPin" className="h-5 w-5" />
             </span>
             <span className="min-w-0">
@@ -455,7 +479,7 @@ function TripView({ trip }) {
                   key={highlight}
                   className="flex items-start gap-2.5 rounded-xl bg-navy-50/70 p-3 text-sm leading-relaxed text-navy-700"
                 >
-                  <Icon name="star" className="mt-0.5 h-4 w-4 flex-none text-accent-500" />
+                  <Icon name="star" className="mt-0.5 h-4 w-4 flex-none text-accent-700" />
                   {highlight}
                 </li>
               ))}
@@ -469,7 +493,7 @@ function TripView({ trip }) {
                 <ul className="mt-2.5 space-y-1.5 text-sm text-navy-700">
                   {trip.pickupDrop.pickupLocations.map((location) => (
                     <li key={location} className="flex items-center gap-2">
-                      <Icon name="mapPin" className="h-4 w-4 flex-none text-accent-500" />
+                      <Icon name="mapPin" className="h-4 w-4 flex-none text-accent-700" />
                       {location}
                     </li>
                   ))}
@@ -539,11 +563,11 @@ function TripView({ trip }) {
                     <ul className="mt-4 space-y-3">
                       {cluster.places.map((place) => (
                         <li key={place.name} className="flex items-start gap-2.5 text-sm">
-                          <Icon name="mapPin" className="mt-0.5 h-4 w-4 flex-none text-accent-500" />
+                          <Icon name="mapPin" className="mt-0.5 h-4 w-4 flex-none text-accent-700" />
                           <span className="min-w-0">
                             <span className="font-semibold text-navy-900">{place.name}</span>
                             {categoryByPlace.get(place.name) ? (
-                              <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-navy-400">
+                              <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-navy-500">
                                 {categoryByPlace.get(place.name)}
                               </span>
                             ) : null}
@@ -579,7 +603,7 @@ function TripView({ trip }) {
           <Section id="stay" title="Accommodation" eyebrow="Where you sleep" className="border-t border-navy-100">
             <Card variant="outline">
               <div className="flex items-center gap-2.5">
-                <Icon name="home" className="h-5 w-5 flex-none text-accent-600" />
+                <Icon name="home" className="h-5 w-5 flex-none text-accent-700" />
                 <p className="text-sm font-semibold text-navy-900">
                   {trip.nights === 0
                     ? 'No overnight on this journey.'

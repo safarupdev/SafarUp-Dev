@@ -158,7 +158,12 @@ export default function TripsPage() {
     title: 'Journeys',
     description:
       'Multi-day journeys across Bihar — temples, heritage, hills and winter wildlife, planned as a complete route you can read end to end before you decide.',
-    canonical: joinUrl(SITE_URL, PATHS.trips),
+    // `noindex` alongside a self-referential `canonical` asserts "this is the
+    // indexable version" and "do not index it" in the same head. While the
+    // itineraries are showcase content there is no indexable version of this
+    // page, so the canonical is withdrawn — the same answer `NotFoundPage` and
+    // `UnavailablePage` already give.
+    canonical: IS_SHOWCASE ? null : joinUrl(SITE_URL, PATHS.trips),
     // The page used to render hero photography while advertising the generic
     // site share card. Real image, same map the cards render from.
     image: SHARE_IMAGE,
@@ -314,7 +319,7 @@ export default function TripsPage() {
 
       <section aria-labelledby="always-included" className="border-y border-navy-100 bg-navy-50/70 py-16">
         <div className="mx-auto max-w-shell px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent-600">The same on every route</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-accent-700">The same on every route</p>
           <h2
             id="always-included"
             className="mt-2 max-w-2xl font-display text-2xl font-bold tracking-tight text-navy-900 sm:text-3xl"

@@ -15,8 +15,15 @@
  * were live.
  *
  * Icons are the one place the two navs must agree: Explore is the globe
- * (browsing everywhere), Trips is the compass (a specific journey). An icon
+ * (browsing everywhere), Journeys is the compass (a specific journey). An icon
  * meaning two different things across breakpoints is a navigation bug.
+ *
+ * NAMING. The route stays `/trips` — it is a technical URL, it is referenced
+ * by `PATHS.trips` everywhere, and renaming a path would break inbound links
+ * for no product gain. What the visitor reads is "Journeys", because the
+ * product is a complete multi-day journey, not a "trip" in the sense of a
+ * single destination with a date on it. The word and the path are deliberately
+ * allowed to differ, and only the word is user-facing.
  */
 import { PATHS } from './routes';
 
@@ -45,9 +52,10 @@ export const NAV_ITEMS = [
     match: 'exact',
   },
   {
+    // The label is "Journeys"; the path is `/trips`. See NAMING above.
     key: 'trips',
-    label: 'Trips',
-    shortLabel: 'Trips',
+    label: 'Journeys',
+    shortLabel: 'Journeys',
     to: PATHS.trips,
     icon: 'compass',
     match: 'prefix',
@@ -98,7 +106,7 @@ export const NAV_ITEMS = [
 export const DESKTOP_NAV = [
   { key: 'home', label: 'Home', to: PATHS.home, match: 'exact' },
   { key: 'explore', label: 'Explore', to: PATHS.explore, match: 'exact' },
-  { key: 'trips', label: 'Trips', to: PATHS.trips, match: 'prefix' },
+  { key: 'trips', label: 'Journeys', to: PATHS.trips, match: 'prefix' },
   { key: 'destinations', label: 'Destinations', to: PATHS.destinations, match: 'prefix', forwardFilters: true },
   { key: 'plan-trip', label: 'Plan a Trip', to: PATHS.planTrip, match: 'exact' },
   { key: 'about', label: 'About', to: PATHS.about, match: 'exact' },

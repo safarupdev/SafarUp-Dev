@@ -17,7 +17,7 @@ export function Wordmark({ tone = 'light' }) {
       <span
         aria-hidden="true"
         className={`flex h-8 w-8 items-center justify-center rounded-lg text-base font-black text-white ${
-          tone === 'light' ? 'bg-navy-900' : 'bg-accent-500'
+          tone === 'light' ? 'bg-navy-900' : 'bg-accent-700'
         }`}
       >
         S
@@ -57,6 +57,12 @@ function destinationsHref(search) {
  * is the other way round. There is no width — 768–1023px in particular, which
  * previously had `md:hidden` on the bar and `lg:flex` here — with no global
  * navigation, and never two at once.
+ *
+ * NAV LABELS. Every visible item label comes from `DESKTOP_NAV`, so there is
+ * no label string to duplicate here: the `/trips` entry reads "Journeys" and
+ * links to `/trips`, and changing one word in `constants/navigation.js`
+ * changes it in this header, the bottom bar and the footer at once. Copy is
+ * never hardcoded in a nav component, or the two surfaces drift.
  */
 export default function SiteHeader() {
   const { pathname, search } = useLocation();

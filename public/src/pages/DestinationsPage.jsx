@@ -1,6 +1,12 @@
 /**
  * Destination list — PRD §22, §17 (`/destinations`).
  *
+ * This is a SUPPORTING discovery layer, not the product. A SafarUp trip is a
+ * complete multi-day journey; a destination is one place a journey passes
+ * through. So the page says that in its framing copy and its relationship
+ * line, and its real job is routing a visitor into a journey rather than
+ * ending the search on a place.
+ *
  * Data comes straight from `GET /api/destinations`; nothing about a
  * destination is hardcoded here. Filters are the contract's own parameters
  * (`district`, `category`) and their values are read from the live taxonomy
@@ -24,6 +30,7 @@ import { SITE_URL } from '../constants/site';
 import { PATHS, destinationPath } from '../constants/routes';
 import { fetchDestinations } from '../api/destinations.api';
 import { fetchCategories, fetchDistricts } from '../api/taxonomy.api';
+import { IS_SHOWCASE, showcaseTripsForDestination } from '../data/showcase';
 
 import DestinationCard from '../components/destination/DestinationCard';
 import DestinationCardSkeleton from '../components/destination/DestinationCardSkeleton';
@@ -34,7 +41,7 @@ import Button from '../components/common/Button';
 import Icon from '../components/common/Icon';
 
 const LIST_DESCRIPTION =
-  'Every destination SafarUp has published, filterable by district and travel category.';
+  'The places SafarUp journeys visit, filterable by district and travel category.';
 
 export default function DestinationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -137,15 +144,31 @@ export default function DestinationsPage() {
               <li className="text-navy-800">Destinations</li>
             </ol>
           </nav>
-          <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-navy-900 sm:text-4xl">
+
+          <p className="mt-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-accent-700">
+            <Icon name="mapPin" className="h-4 w-4" />
+            Where SafarUp journeys go
+          </p>
+          <h1 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy-900 sm:text-4xl">
             Destinations
           </h1>
           <p className="measure mt-3 text-base leading-relaxed text-navy-600">
-            {hasFilters && (selectedDistrict || selectedCategory)
-              ? `Showing destinations${selectedDistrict ? ` in ${selectedDistrict.name}` : ''}${
-                  selectedCategory ? ` across ${selectedCategory.name}` : ''
-                }.`
-              : LIST_DESCRIPTION}
+            A SafarUp trip is a complete multi-day route, not a single place — it sets out from
+            one destination, crosses at least one more, sleeps on the way and comes back. This
+            index is the supporting layer underneath that: every destination we have published, so
+            you can see what a journey passes through before you choose one.
+          </p>
+          {hasFilters && (selectedDistrict || selectedCategory) ? (
+            <p className="measure mt-3 text-base leading-relaxed text-navy-600">
+              Showing destinations{selectedDistrict ? ` in ${selectedDistrict.name}` : ''}
+              {selectedCategory ? ` across ${selectedCategory.name}` : ''}.
+            </p>
+          ) : null}
+          <p className="mt-5">
+            <Button as="link" to={PATHS.trips} size="md">
+              See the journeys
+              <Icon name="arrowRight" className="h-4 w-4" />
+            </Button>
           </p>
         </div>
       </div>
@@ -217,9 +240,7 @@ export default function DestinationsPage() {
                 </p>
                 <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                   {items.map((destination) => (
-                    <li key={destination.id}>
-                      <DestinationCard destination={destination} />
-                    </li>
+                    <DestinationListItem key={destination.id} destination={destination} />
                   ))}
                 </ul>
 
@@ -241,14 +262,71 @@ export default function DestinationsPage() {
             ) : null}
 
             {!isInitialLoading && !isError && items.length > 0 ? (
-              <p className="mt-10 flex items-center justify-center gap-2 text-center text-sm text-navy-500">
-                <Icon name="compass" className="h-4 w-4" />
-                That is everything published so far.
+              <p className="mt-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm text-navy-500">
+                <span className="flex items-center gap-2">
+                  <Icon name="compass" className="h-4 w-4" />
+                  That is every destination published so far.
+                </span>
+                <Link
+                  to={PATHS.trips}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 font-semibold text-brand-700 transition-colors duration-150 ease-standard hover:bg-navy-50"
+                >
+                  Ready to pick a route through one of them?
+                  <Icon name="arrowRight" className="h-4 w-4" />
+                </Link>
               </p>
             ) : null}
           </section>
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A destination card plus its journey relationship.
+ *
+ * The line lives HERE, in a page-local wrapper, rather than inside
+ * `DestinationCard`: that component is shared with Home and Explore, and a
+ * journey count only makes sense on the page whose job is routing people from
+ * a place into a journey. Putting it in the shared card would assert a
+ * relationship on surfaces that have no business making it.
+ *
+ * **The count is derived, never asserted.** `showcaseTripsForDestination`
+ * matches `trip.destinationSlug` EXACTLY against this destination's slug — no
+ * district match, no keyword match, no hand-written list, because each of
+ * those invents a relationship the data does not state. A destination no
+ * journey points at renders NOTHING here, which is the correct answer:
+ * "On 0 journeys" is a statement about a gap, and a grid of them would read as
+ * a broken relationship rather than an honest one.
+ *
+ * Featured destinations keep their prominence: the card's own Featured badge
+ * is untouched, and the relationship line is deliberately quieter than the
+ * badge so it never competes with it for attention.
+ */
+function DestinationListItem({ destination }) {
+  const journeys = showcaseTripsForDestination(destination.slug);
+
+  return (
+    <li className="flex flex-col">
+      <DestinationCard destination={destination} />
+      {journeys.length > 0 ? (
+        <p className="mt-2.5 flex items-center gap-1.5 text-xs font-semibold text-navy-600">
+          <Icon name="route" className="h-3.5 w-3.5 flex-none text-navy-500" />
+          <span>
+            {/* "Example" while showcase, so this indexed page cannot imply a
+                published departure that does not exist. `TripCard` carries the
+                same qualifier, but this line has no card of its own. */}
+            On {journeys.length}{' '}
+            {IS_SHOWCASE ? 'example SafarUp journey' : 'SafarUp journey'}
+            {journeys.length === 1 ? '' : 's'}
+            {/* `journeys.length` is the count; the word after it is the only
+                thing `IS_SHOWCASE` changes. The leading ternary above is
+                identical in both branches and exists only to document that —
+                it must not be read as a conditional. */}
+          </span>
+        </p>
+      ) : null}
+    </li>
   );
 }

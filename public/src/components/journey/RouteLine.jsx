@@ -88,13 +88,26 @@ export default function RouteLine({ route, size = 'md', tone = 'light', classNam
     <div className={className}>
       <p className="sr-only">{tripRouteDescription({ route })}</p>
 
+      {/*
+        Vertical below `sm`, horizontal at `sm` and up.
+        Horizontally-wrapping was the bug: the connector lived inside each `<li>`
+        ahead of its own marker, so a wrap opened the new row with a dangling
+        dash and no marker to its left — the journey stopped reading as one
+        connected thing. A vertical rail cannot wrap, so mobile gets one column
+        and the row-height risk disappears entirely.
+      */}
       <ol
         aria-hidden="true"
-        className={`flex flex-wrap items-center ${s.gap} ${s.text} font-semibold`}
+        className={`flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-2 ${s.text} font-semibold`}
       >
         {route.map((leg, index) => (
           <li key={`${leg.name}-${leg.role}-${index}`} className="flex items-center">
-            {index > 0 ? <span className={`${s.line} ${connector} mx-1.5 flex-none rounded-full`} /> : null}
+            {index > 0 ? (
+              <span
+                className={`${connector} flex-none rounded-full sm:h-px sm:w-4 sm:mx-1.5 sm:w-6`}
+                style={{ width: '2px', height: '0.75rem' }}
+              />
+            ) : null}
             <Marker leg={leg} size={s} />
             <span
               className={`ml-1.5 whitespace-nowrap ${leg.role === 'return' ? returnText : label}`}

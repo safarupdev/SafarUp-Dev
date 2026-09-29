@@ -9,7 +9,7 @@ const FOOTER_GROUPS = [
     heading: 'Explore',
     links: [
       { label: 'Destinations', to: PATHS.destinations },
-      { label: 'Trips', to: PATHS.trips },
+      { label: 'Journeys', to: PATHS.trips },
       { label: 'Travel Stories', to: PATHS.blog },
     ],
   },
@@ -48,8 +48,8 @@ export default function SiteFooter() {
           <div className="space-y-3">
             <Wordmark tone="dark" />
             <p className="max-w-xs text-sm leading-relaxed text-navy-300">
-              {SITE_NAME} — {SITE_TAGLINE} Curated group trips and fully customised private journeys
-              across India.
+              {SITE_NAME} — {SITE_TAGLINE} Complete multi-day journeys across several places, with
+              every stop and overnight shown in full.
             </p>
           </div>
 
@@ -57,16 +57,20 @@ export default function SiteFooter() {
             <nav key={group.id} aria-labelledby={`footer-group-${group.id}`}>
               <p
                 id={`footer-group-${group.id}`}
-                className="text-xs font-bold uppercase tracking-wider text-navy-400"
+                className="text-xs font-bold uppercase tracking-wider text-navy-500"
               >
                 {group.heading}
               </p>
-              <ul className="mt-3 space-y-2.5">
+              {/* `space-y-0.5` + a 44px link: the list is dense, but on mobile
+                  the footer is the ONLY navigation to /blog, /dashboard and
+                  /login, so it is a primary control surface and not furniture.
+                  Measured at 24px tall before this fix. */}
+              <ul className="mt-2 space-y-0.5">
                 {group.links.map((link) => (
                   <li key={link.label}>
                     <Link
                       to={link.to}
-                      className="inline-block rounded py-0.5 text-sm text-navy-200 transition-colors hover:text-white"
+                      className="inline-flex min-h-11 items-center rounded text-sm text-navy-200 transition-colors hover:text-white"
                     >
                       {link.label}
                     </Link>
@@ -77,20 +81,20 @@ export default function SiteFooter() {
           ))}
 
           <div className="space-y-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-navy-400">Start planning</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-navy-500">Start planning</p>
             <p className="text-sm leading-relaxed text-navy-300">
               Tell us where and when. Our team builds the rest.
             </p>
             <Link
               to={PATHS.planTrip}
-              className="inline-flex min-h-11 items-center rounded-full bg-accent-600 px-5 text-sm font-semibold text-white transition-colors duration-150 ease-standard hover:bg-accent-700"
+              className="inline-flex min-h-11 items-center rounded-full bg-accent-700 px-5 text-sm font-semibold text-white transition-colors duration-150 ease-standard hover:bg-accent-800"
             >
               Plan a Private Trip
             </Link>
           </div>
         </div>
 
-        <p className="mt-10 border-t border-navy-800 pt-6 text-xs text-navy-400">
+        <p className="mt-10 border-t border-navy-800 pt-6 text-xs text-navy-500">
           © {new Date().getFullYear()} {SITE_NAME}. All rights reserved.
         </p>
       </div>

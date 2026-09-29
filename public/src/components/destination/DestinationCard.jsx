@@ -22,7 +22,7 @@ import { destinationPath } from '../../constants/routes';
 
 function FeaturedBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-accent-500 px-2.5 py-1 text-[0.7rem] font-bold uppercase tracking-wide text-white">
+    <span className="inline-flex items-center gap-1 rounded-full bg-accent-700 px-2.5 py-1 text-[0.7rem] font-bold uppercase tracking-wide text-white">
       <Icon name="sparkle" className="h-3.5 w-3.5" />
       Featured
     </span>
