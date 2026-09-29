@@ -295,7 +295,7 @@ const canonical = IS_SHOWCASE ? null : joinUrl(SITE_URL, PATHS.trips, trip.slug)
               src={heroImage}
               alt=""
               className="absolute inset-0 h-full w-full object-cover opacity-45"
-              fetchPriority="high"
+              fetchpriority="high"
             />
             <div
               aria-hidden="true"

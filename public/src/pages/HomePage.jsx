@@ -248,7 +248,7 @@ export default function HomePage() {
             src={HERO_IMAGES[REFERENCE_TRIP.slug]}
             alt=""
             className="absolute inset-0 h-full w-full object-cover opacity-55"
-            fetchPriority="high"
+            fetchpriority="high"
             decoding="async"
           />
         ) : null}

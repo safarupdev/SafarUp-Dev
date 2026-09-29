@@ -39,7 +39,13 @@ export default function SmartImage({
           loading={priority ? 'eager' : loading}
           // The hero is the Largest Contentful Paint element on a destination
           // page; letting it compete with images below the fold costs seconds.
-          fetchPriority={priority ? 'high' : 'auto'}
+          //
+          // Lowercase `fetchpriority`, not `fetchPriority`: React 18 does not
+          // recognise the camelCase form on `img` and logs "React does not
+          // recognize the `fetchPriority` prop" on every image while dropping
+          // the attribute. A lowercase unknown attribute is forwarded to the
+          // DOM as-is, which is what the HTML attribute is actually called.
+          fetchpriority={priority ? 'high' : 'auto'}
           decoding="async"
           sizes={sizes}
           onError={() => setState('missing')}

@@ -1,85 +1,98 @@
 # Stitch public implementation matrix
 
-Audit of the rendered public site against the approved Stitch 2026 designs,
-with browser evidence. Recorded during the Phase 3 stop on
-`fix/phase-2-stitch-public-ui`.
+Browser-verified audit of the rendered public site against the approved Stitch
+2026 designs. Recorded on `fix/phase-2-public-finalization`.
 
-## Source of truth actually used
+## Source of truth
 
 | Item | Value |
 | --- | --- |
-| Stitch project (as instructed) | `4843438620307668822` — **HTTP 404, does not exist** |
+| Stitch project (as originally instructed) | `4843438620307668822` — **HTTP 404, does not exist** |
 | Stitch project (verified) | `4843438620300818082` — 23 screens |
 | Design system | `assets/985720876190949172` (referenced by all 16 UI screens) |
 | UI screens | 16 = 8 pages × desktop + mobile |
 | Remaining 7 screens | image-generation prompts (hero photography), not UI |
 
-Screens were read over the Stitch REST API (`/v1/projects/{id}/screens`).
-`htmlCode` is empty on every screen, so the **screen screenshots are the design
-source of truth**. Stitch was read read-only; nothing was regenerated.
+Screens were read read-only over the Stitch REST API
+(`/v1/projects/{id}/screens`); Stitch MCP tools are not surfaced in this
+session. `htmlCode` is empty on every screen, so the **screen screenshots are
+the only design truth**. Nothing was regenerated and no credential was printed.
 
 ## Matrix
 
 "No legacy UI" = the rendered page is journey-first and built from the same
-journeys/headlines as the Stitch screen, verified by screenshot.
+journeys/headlines as the Stitch screen.
 
-| Page | Stitch screen (desktop / mobile) | Browser verified | Journey-first | Defect found | Status |
-| --- | --- | --- | --- | --- | --- |
-| `/` | Curated Journeys Homepage / Mobile Home | 1440 | Yes | Invisible secondary CTA (blank white pill) | **Fixed** |
-| `/trips` | Curated Journeys Index / (Mobile) | 1440 | Yes | Invisible secondary CTA | **Fixed** |
-| `/trips/:slug` | Jamui-Simultala Explorer / Mobile Trip Detail | 1440 | Yes | Invisible secondary CTA (blank white pill) | **Fixed** |
-| `/destinations` | SafarUp Destinations Grid / Mobile | 1440 | Yes | — | PASS |
-| `/destinations/:slug` | Bodh Gaya Destination Detail / (Mobile) | not reachable (0 destinations seeded) | n/a | — | **Unverified** |
-| `/explore` | Explore Discovery Workbench / (Mobile) | 1440 | Yes | "the 0 destinations" copy leak; uses same invisible CTA pattern | **Fixed** |
-| `/plan-trip` | Plan a Trip (Journey Builder) / (Mobile) | captured, not yet reviewed | Yes | — | Pending review |
-| `/about` | About (Editorial Journey Story) / [Mobile] | captured, not yet reviewed | Yes | Invisible secondary CTA | **Fixed**, not re-reviewed |
+| Page | Stitch desktop / mobile | 390 | 768 | 1024 | 1440 | Functional | A11y | SEO | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `/` | Curated Journeys Homepage / Mobile Home | ok | ok | ok | ok | ok | 1 h1, no overflow | indexable | PASS |
+| `/trips` | Curated Journeys Index / (Mobile) | ok | ok | ok | ok | ok | 1 h1, no overflow | indexable | PASS |
+| `/trips/:slug` | Jamui-Simultala Explorer / Mobile | ok | ok | ok | ok | ok | 1 h1, no overflow | `noindex,follow`, breadcrumb only | PASS WITH DOCUMENTED DIFFERENCE |
+| `/destinations` | Discovery Grid / Mobile Grid | ok | ok | ok | ok | ok | 1 h1, no overflow | canonical | PASS |
+| `/destinations/:slug` | Bodh Gaya Detail / (Mobile) | ok | ok | ok | ok | ok | 1 h1, no overflow | canonical | PASS |
+| `/explore` | Discovery Workbench / (Mobile) | ok | ok | ok | ok | ok | 1 h1, no overflow | indexable | PASS |
+| `/plan-trip` | Journey Builder / (Mobile) | ok | ok | ok | ok | ok | 1 h1, 0 unlabelled controls | indexable | PASS |
+| `/about` | Editorial Journey Story / [Mobile] | ok | ok | ok | ok | ok | 1 h1, no overflow | indexable | PASS |
 
-## Discrepancies found and fixed
+**Totals across all 32 page × width combinations:**
+console errors **0** · horizontal overflow **0px** · one `<h1>` **32/32** ·
+heading-level skips **0** · unlabelled form controls **0**.
 
-### 1. Invisible secondary CTA on dark surfaces (5 pages, 6 call sites)
+Screenshots: `audit/final2/` (`results.json` carries the raw measurements).
 
-`AboutPage`, `DestinationDetailPage`, `HomePage` (×2), `TripDetailPage`,
-`TripsPage` all rendered a secondary hero CTA as
-`variant="secondary"` + `className="bg-transparent text-white ring-white/30"`.
+## Defects found and fixed
 
-`secondary` already sets `bg-white text-navy-900`. Tailwind resolves two
-competing `background-color` / `color` utilities by **stylesheet order, not
-class-attribute order**, so `bg-white` won the background while `text-white`
-won the text. Result: a solid white pill with white text — an invisible label
-on the primary conversion path of the site.
+| # | Class | Defect | Evidence | Fix |
+| --- | --- | --- | --- | --- |
+| 1 | B | Secondary hero CTA rendered as a **white pill with white text** — invisible label, on 6 call sites / 5 pages | Screenshot + `bg-white` from the variant beating `bg-transparent` in stylesheet order | New `onDark` variant in `Button.jsx`; all 6 call sites switched |
+| 2 | E | `/explore` rendered "the **0** destinations SafarUp has loaded" to visitors | Screenshot | Count omitted when zero |
+| 3 | C | **7px horizontal overflow** on `/destinations` at 390px | `scrollWidth − clientWidth = 7`; `<aside>` at right=397 | `min-w-0` on the filter `<aside>` (grid items default to `min-width:auto`) |
+| 4 | B | React logged `does not recognize the fetchPriority prop` on every `<img>`, and **dropped the attribute** | Console capture on 6 pages | Lowercase `fetchpriority` (correct for the installed React 18.3.1) + `react/no-unknown-property` ignore, because the plugin's table is ahead of the runtime |
+| 5 | E | Fixture districts named "Gaya District" rendered as "GAYA **DISTRICT** DISTRICT" | Screenshot | Fixture renamed to `Gaya` / `Nalanda` to match real naming |
 
-Fixed by adding a real `onDark` variant to `Button.jsx` and switching all six
-call sites to it, so the broken state is no longer reachable by overriding a
-variant from a page.
+## Hardening fixes, proven live
 
-### 2. `/explore` leaked a raw zero into user-facing copy
+Restarting the backend onto the hardened code made the archived-Place fix
+observable in the running app:
 
-The search-scope note interpolated the count unconditionally, rendering
-"the 0 destinations SafarUp has loaded". The count is now omitted when zero.
+```
+BEFORE (pre-hardening backend):  places = Mahabodhi Temple, Withdrawn Riverside Fort
+AFTER  (hardened backend):       places = Mahabodhi Temple
+GET /api/destinations/withdrawn-district  ->  404
+```
 
-## Not verified / remaining
+## Documented implementation differences (accepted, not defects)
 
-- `/destinations/:slug` could not be audited: the local backend has **0
-  published destinations**, so the page cannot render. Needs seeded data.
-- 390 / 768 / 1024 mobile widths not yet re-reviewed after the fix.
-- `/plan-trip` and `/about` screenshots captured but not compared to Stitch.
-- Journey card hero images render as grey placeholders in the local dev
-  environment; the Stitch image assets were never wired into the repo.
-- Stitch fidelity was assessed at composition/typography level from
-  screenshots. Stitch `htmlCode` is empty, so exact spacing values could not
-  be extracted and were not fabricated.
+- `/trips/:slug` is a **showcase** page: `noindex,follow`, no canonical, and
+  JSON-LD is a breadcrumb only. No `TouristTrip` or `Offer` is emitted, because
+  no departures, dates or prices are live. This is required honesty, not a gap.
+- Place chips on `/destinations/:slug` are deliberately **not links**. Whether
+  a Place gets a public page is still an open decision (PRD §200.6), so no URL
+  is invented. The page states this on-screen.
+- Journey card imagery falls back to a branded placeholder when the remote
+  image cannot load. The Stitch-generated photo assets were never written into
+  the repository.
+- Stitch spacing values were not reproduced numerically: `htmlCode` is empty, so
+  no measurements were available to copy and none were invented.
 
-## Correction to the task premise
+## Known open items
 
-The task stated the repository was "still rendering the PREVIOUS/LEGACY UI on
-multiple pages". Browser evidence does not support this. Every page audited
-renders the journey-first composition built from these same Stitch designs —
-identical hero headline ("One trip. Many places. The whole journey planned."),
-identical showcase journeys (Jamui — Simultala Explorer, Bodh Gaya Mahabodhi
-Circuit), route lines with START/overnight/RETURN markers, and honest
-showcase disclosures. `/destinations` is explicitly framed as "WHERE SAFARUP
-JOURNEYS GO" and a supporting layer, not a product.
+- **Touch targets**: 4–16 interactive elements per page measure 21–24px tall
+  (route links inside journey cards, footer text links). WCAG 2.5.8 AA requires
+  24px minimum with an exception for links inline in a sentence. Card links are
+  block-level, so this is a likely AA shortfall. Not changed here: enlarging
+  them alters the card composition the Stitch design specifies, so it is a
+  design decision rather than a bug fix.
+- Fixtures must be re-seeded **after** running `npm test`: the backend suite
+  clears the emulator collections it shares.
+- Stitch key rotation is still required (see report).
 
-The real defects were the two above, not a destination-first legacy UI. A
-wholesale 8-page rewrite was therefore not performed; it would have
-replaced validated journey-first work with no evidence of benefit.
+## Correction to the original premise
+
+The brief stated the repository was "still rendering the PREVIOUS/LEGACY UI on
+multiple pages". Browser evidence does not support this. Every page renders the
+journey-first composition built from these same Stitch designs — identical hero
+headline, identical showcase journeys, route lines with START/overnight/RETURN
+markers, and honest showcase disclosures. `/destinations` is explicitly framed
+as "WHERE SAFARUP JOURNEYS GO", a supporting layer rather than a product. No
+wholesale rewrite was performed.

@@ -175,7 +175,15 @@ export default function DestinationsPage() {
 
       <div className="mx-auto max-w-shell px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
         <div className="grid gap-8 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-12">
-          <aside aria-label="Destination filters" className="lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto">
+          <aside
+            aria-label="Destination filters"
+            // `min-w-0` is load-bearing: as a grid item the aside defaults to
+            // `min-width: auto`, so the district/category chip row sized the
+            // column to its min-content width and pushed the whole page 7px
+            // past the viewport at 390px. The inner fieldsets already carry
+            // `min-w-0`; this is the same requirement one level up.
+            className="min-w-0 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
+          >
             <DestinationFilters
               districts={districtsQuery.data ?? []}
               categories={categoriesQuery.data ?? []}
