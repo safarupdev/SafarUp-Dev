@@ -4,6 +4,8 @@
  * fast, keyboard-friendly rather than decorative).
  */
 
+import { forwardRef } from 'react';
+
 const VARIANTS = {
   primary: 'bg-brand-600 text-white hover:bg-brand-700 focus-visible:outline-brand-600',
   secondary: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 focus-visible:outline-slate-400',
@@ -11,20 +13,37 @@ const VARIANTS = {
   ghost: 'bg-transparent text-slate-600 hover:bg-slate-100 focus-visible:outline-slate-400',
 };
 
-export default function Button({
-  children,
-  variant = 'primary',
-  isLoading = false,
-  disabled = false,
-  type = 'button',
-  className = '',
-  ...rest
-}) {
+const BASE =
+  'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
+
+/** Shared class builder, so a link styled as a button matches a real Button. */
+export function buttonClassName(variant = 'primary', className = '') {
+  return `${BASE} ${VARIANTS[variant] ?? VARIANTS.primary} ${className}`;
+}
+
+/**
+ * `forwardRef` so a Button can receive focus programmatically — the
+ * confirmation dialog moves focus to its confirm action when it opens
+ * (DESIGN_SYSTEM §9: keyboard operability, visible focus).
+ */
+const Button = forwardRef(function Button(
+  {
+    children,
+    variant = 'primary',
+    isLoading = false,
+    disabled = false,
+    type = 'button',
+    className = '',
+    ...rest
+  },
+  ref
+) {
   return (
     <button
+      ref={ref}
       type={type}
       disabled={disabled || isLoading}
-      className={`inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${VARIANTS[variant]} ${className}`}
+      className={buttonClassName(variant, className)}
       {...rest}
     >
       {isLoading && (
@@ -36,4 +55,6 @@ export default function Button({
       {children}
     </button>
   );
-}
+});
+
+export default Button;

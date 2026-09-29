@@ -27,6 +27,15 @@ import ComingSoonPage from './pages/ComingSoonPage';
 import ForbiddenPage from './pages/ForbiddenPage';
 import NotFoundPage from './pages/NotFoundPage';
 
+import DestinationListPage from './pages/destinations/DestinationListPage';
+import DestinationFormPage from './pages/destinations/DestinationFormPage';
+import DistrictListPage from './pages/districts/DistrictListPage';
+import DistrictFormPage from './pages/districts/DistrictFormPage';
+import CategoryListPage from './pages/categories/CategoryListPage';
+import CategoryFormPage from './pages/categories/CategoryFormPage';
+import PlaceListPage from './pages/places/PlaceListPage';
+import PlaceFormPage from './pages/places/PlaceFormPage';
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -60,13 +69,41 @@ function App() {
                 <Route path="/bookings/completed" element={<ComingSoonPage />} />
 
                 <Route path="/customers" element={<ComingSoonPage />} />
-                <Route path="/destinations" element={<ComingSoonPage />} />
                 <Route path="/hotels" element={<ComingSoonPage />} />
                 <Route path="/transport" element={<ComingSoonPage />} />
                 <Route path="/activities" element={<ComingSoonPage />} />
                 <Route path="/blog" element={<ComingSoonPage />} />
                 <Route path="/communications" element={<ComingSoonPage />} />
                 <Route path="/reports" element={<ComingSoonPage />} />
+
+                {/* Content CMS (PRD §38, §149). Content and above may manage
+                    content — see the permission matrices in
+                    docs/CONTRACTS/*.domain.contract.md §8/§5. This role gate is
+                    a UX convenience only: the backend `authorize()` middleware
+                    independently re-checks the role on every request. */}
+                <Route
+                  element={
+                    <ProtectedRoute
+                      allowedRoles={[ROLES.CONTENT, ROLES.OPERATIONS, ROLES.ADMIN, ROLES.SUPER_ADMIN]}
+                    />
+                  }
+                >
+                  <Route path="/destinations" element={<DestinationListPage />} />
+                  <Route path="/destinations/new" element={<DestinationFormPage />} />
+                  <Route path="/destinations/:id" element={<DestinationFormPage />} />
+
+                  <Route path="/districts" element={<DistrictListPage />} />
+                  <Route path="/districts/new" element={<DistrictFormPage />} />
+                  <Route path="/districts/:id" element={<DistrictFormPage />} />
+
+                  <Route path="/categories" element={<CategoryListPage />} />
+                  <Route path="/categories/new" element={<CategoryFormPage />} />
+                  <Route path="/categories/:id" element={<CategoryFormPage />} />
+
+                  <Route path="/places" element={<PlaceListPage />} />
+                  <Route path="/places/new" element={<PlaceFormPage />} />
+                  <Route path="/places/:id" element={<PlaceFormPage />} />
+                </Route>
 
                 {/* Role-restricted sections (PRD §36, §100) */}
                 <Route

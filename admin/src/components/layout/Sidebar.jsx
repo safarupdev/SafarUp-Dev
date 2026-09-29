@@ -4,8 +4,8 @@
  * treatment here: a plain, collapsible list rather than heavy graphics.
  */
 
-import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { NAV_SECTIONS } from '../../constants/navigation';
 import { useAuth } from '../../context/AuthContext';
 
@@ -14,7 +14,21 @@ function isVisible(section, role) {
 }
 
 function NavGroup({ section }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+
+  // A group opens itself when one of its children is the current screen (or
+  // an editor is deep inside it), so a section is never hidden behind a
+  // collapsed disclosure just because the user navigated straight to it.
+  const containsActive = section.children.some(
+    (child) =>
+      location.pathname === child.path || location.pathname.startsWith(`${child.path}/`)
+  );
+
+  const [isOpen, setIsOpen] = useState(containsActive);
+
+  useEffect(() => {
+    if (containsActive) setIsOpen(true);
+  }, [containsActive]);
 
   return (
     <div>

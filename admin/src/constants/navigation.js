@@ -6,13 +6,13 @@
  * access on every route. Items without `roles` are visible to any staff
  * role (everyone who can log into the admin app at all).
  *
- * Only a Dashboard route is actually implemented in this phase (§149
- * Phase 2 scope: "Admin authentication, roles, dashboard, destination CMS,
- * trip CMS, itinerary builder, departure management"). The remaining §36
- * sections are listed here as the intended structure but link to a
- * "Coming soon" placeholder until their respective domain models/pages are
- * built, so the nav accurately reflects the PRD without presenting dead
- * links as errors.
+ * Only the Dashboard route and the content CMS (Destinations, Districts,
+ * Categories, Places) are actually implemented in this phase (§149 Phase 2
+ * scope: "Admin authentication, roles, dashboard, destination CMS, trip CMS,
+ * itinerary builder, departure management"). The remaining §36 sections are
+ * listed here as the intended structure but link to a "Coming soon"
+ * placeholder until their respective domain models/pages are built, so the nav
+ * accurately reflects the PRD without presenting dead links as errors.
  */
 
 import { ROLES } from './roles';
@@ -50,7 +50,21 @@ export const NAV_SECTIONS = [
     ],
   },
   { label: 'Customers', path: '/customers' },
-  { label: 'Destinations', path: '/destinations' },
+  {
+    // Content CMS — PRD §38. Content and above manage Destinations and the
+    // District / Category / Place taxonomy they depend on
+    // (DESTINATION.domain.contract.md §8). The same role list is applied to
+    // the routes in App.jsx; either way the backend `authorize()` middleware
+    // is the actual boundary (PRD §60).
+    label: 'Destinations',
+    roles: [ROLES.CONTENT, ROLES.OPERATIONS, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    children: [
+      { label: 'Destinations', path: '/destinations' },
+      { label: 'Districts', path: '/districts' },
+      { label: 'Categories', path: '/categories' },
+      { label: 'Places', path: '/places' },
+    ],
+  },
   { label: 'Hotels', path: '/hotels' },
   { label: 'Transport', path: '/transport' },
   { label: 'Activities', path: '/activities' },
