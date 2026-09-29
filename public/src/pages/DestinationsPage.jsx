@@ -121,7 +121,9 @@ export default function DestinationsPage() {
   const isError = listQuery.isError;
 
   return (
-    <div className="pb-safe-nav">
+    // Bottom-nav clearance is NOT applied per page. PublicLayout reserves it
+    // once, on the footer, so every route is covered — including this one.
+    <div>
       <div className="border-b border-navy-100 bg-navy-50/70">
         <div className="mx-auto max-w-shell px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
           <nav aria-label="Breadcrumb">

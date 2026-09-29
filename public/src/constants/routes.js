@@ -16,11 +16,14 @@ export const PATHS = {
   trips: '/trips',
   blog: '/blog',
   planTrip: '/plan-trip',
+  about: '/about',
+  explore: '/explore',
   login: '/login',
   dashboardBookings: '/dashboard/bookings',
 };
 
 export const destinationPath = (slug) => joinUrl(PATHS.destinations, slug);
+export const tripPath = (slug) => joinUrl(PATHS.trips, slug);
 
 /**
  * RESERVED, `noindex`. `/places/:slug` is NOT part of PRD §17 — whether a

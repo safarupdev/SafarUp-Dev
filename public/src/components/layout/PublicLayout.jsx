@@ -3,9 +3,11 @@
  *
  * Composition differs by breakpoint by design (PRD §167): a sticky expanded
  * header and multi-column content on desktop; a compact brand bar plus the
- * fixed bottom navigation on mobile. There is no hamburger anywhere in this
- * file, because a hamburger as global mobile navigation is prohibited
- * (PRD §168, DESIGN_SYSTEM.md §5).
+ * fixed bottom navigation on mobile. The two hand over at a single shared
+ * `lg` breakpoint (see BottomNav.jsx and SiteHeader.jsx) so exactly one
+ * primary global nav is present at every width. There is no hamburger
+ * anywhere in this file, because a hamburger as global mobile navigation is
+ * prohibited (PRD §168, DESIGN_SYSTEM.md §5).
  */
 
 import { useEffect } from 'react';
@@ -41,7 +43,27 @@ export default function PublicLayout() {
         <Outlet />
       </main>
 
-      <SiteFooter />
+      {/*
+        Bottom-nav clearance, reserved ONCE here for every route. It used to
+        be applied per page — and only DestinationsPage did it at all — so the
+        fixed bar sat on top of the footer's last legal line on every other
+        route.
+
+        `.pb-nav-clearance` (index.css) derives the value from the same tokens
+        the bar is built from — `spacing.floating-nav` +
+        `spacing.floating-nav-gap` + `env(safe-area-inset-bottom)` — and
+        releases itself at `lg`, the breakpoint where SiteHeader's expanded nav
+        replaces the bar. Nothing here is a magic number, so the reservation
+        cannot drift when the bar's height changes.
+
+        Deliberately NOT `.pb-floating-nav`: Tailwind auto-generates a
+        `pb-floating-nav` utility from the `spacing.floating-nav` token, and
+        because utilities are emitted after components, that generated rule
+        wins the cascade and drops the safe-area term at every width.
+      */}
+      <div className="pb-nav-clearance">
+        <SiteFooter />
+      </div>
 
       <BottomNav />
     </div>

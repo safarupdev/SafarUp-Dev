@@ -17,7 +17,7 @@ import { Link } from 'react-router-dom';
 
 import { useSeo } from '../lib/seo';
 import { joinUrl } from '../lib/format';
-import { SITE_NAME, SITE_TAGLINE, SITE_URL, DEFAULT_DESCRIPTION } from '../constants/site';
+import { SITE_TAGLINE, SITE_URL, DEFAULT_DESCRIPTION, organizationNode, websiteNode } from '../constants/site';
 import { PATHS } from '../constants/routes';
 import { fetchDestinations } from '../api/destinations.api';
 
@@ -26,6 +26,7 @@ import DestinationCardSkeleton from '../components/destination/DestinationCardSk
 import EmptyState from '../components/states/EmptyState';
 import ErrorState from '../components/states/ErrorState';
 import Button from '../components/common/Button';
+import Card from '../components/common/Card';
 import Icon from '../components/common/Icon';
 
 const WHY_SAFARUP = [
@@ -66,27 +67,7 @@ export default function HomePage() {
 
   const featured = featuredQuery.data?.items ?? [];
 
-  const structuredData = useMemo(
-    () => [
-      {
-        '@context': 'https://schema.org',
-        '@type': 'Organization',
-        '@id': joinUrl(SITE_URL, '/#organization'),
-        name: SITE_NAME,
-        url: SITE_URL,
-        slogan: SITE_TAGLINE,
-      },
-      {
-        '@context': 'https://schema.org',
-        '@type': 'WebSite',
-        '@id': joinUrl(SITE_URL, '/#website'),
-        name: SITE_NAME,
-        url: SITE_URL,
-        description: DEFAULT_DESCRIPTION,
-      },
-    ],
-    []
-  );
+  const structuredData = useMemo(() => [organizationNode(), websiteNode()], []);
 
   useSeo({
     title: null,
@@ -107,12 +88,21 @@ export default function HomePage() {
         />
         <div className="relative mx-auto max-w-shell px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent-300">SafarUp</p>
-          <h1 className="mt-4 max-w-3xl font-display text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-6xl">
-            {SITE_TAGLINE}
+          {/*
+            The h1 carries the topical claim, not the brand line. "Travel.
+            Planned Better." is a slogan: it is identical on every page that
+            prints it, describes no subject, and matches no query. The tagline
+            still appears, immediately below the h1, as supporting copy.
+          */}
+          <h1 className="mt-4 max-w-3xl font-display text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl">
+            Curated group trips and private journeys across India
           </h1>
-          <p className="measure mt-6 text-lg leading-relaxed text-white/85">
-            Curated group departures and fully customised private journeys across India — planned by
-            travellers, priced transparently, and managed from booking to departure.
+          <p className="measure mt-5 font-display text-xl font-bold tracking-tight text-accent-300 sm:text-2xl">
+            {SITE_TAGLINE}
+          </p>
+          <p className="measure mt-4 text-lg leading-relaxed text-white/85">
+            Planned by travellers, priced transparently, and managed from booking to departure —
+            every itinerary, inclusion and availability shown before you commit.
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
             <Button as="link" to={PATHS.destinations} size="lg">
@@ -197,13 +187,13 @@ export default function HomePage() {
           </h2>
           <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {WHY_SAFARUP.map((item) => (
-              <li key={item.title} className="rounded-2xl bg-white p-6 ring-1 ring-navy-100 shadow-card">
+              <Card as="li" key={item.title} pad="lg">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy-900 text-white">
                   <Icon name={item.icon} className="h-5 w-5" />
                 </span>
                 <h3 className="mt-4 text-base font-bold text-navy-900">{item.title}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-navy-600">{item.body}</p>
-              </li>
+              </Card>
             ))}
           </ul>
         </div>
@@ -215,13 +205,15 @@ export default function HomePage() {
         </h2>
         <ol className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {HOW_IT_WORKS.map((item, index) => (
-            <li key={item.step} className="relative rounded-2xl border border-navy-100 bg-white p-6">
+            // `outline`: these sit on white, directly below the raised "Why
+            // SafarUp" cards. Two shadows on the same screen compete.
+            <Card as="li" key={item.step} variant="outline" pad="lg">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-500 text-sm font-bold text-white">
                 {index + 1}
               </span>
               <h3 className="mt-4 text-base font-bold text-navy-900">{item.step}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-navy-600">{item.body}</p>
-            </li>
+            </Card>
           ))}
         </ol>
       </section>

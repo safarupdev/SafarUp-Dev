@@ -21,13 +21,39 @@
     @apply bg-white text-navy-900 antialiased;
   }
 
+  /*
+   * The one and only focus indicator (DESIGN_SYSTEM.md §7 / §9). Defined once
+   * here so it cannot drift between components, and `outline` rather than
+   * `box-shadow` so it survives forced-colours mode and does not fight the
+   * `shadow-*` / `ring-*` utilities a component may already set.
+   *
+   * Measured against this config's hex values:
+   *   brand.600 #1d4ed8 on white            6.70:1  — passes AA
+   *   brand.600 #1d4ed8 on navy.950 #0a1120 2.81:1  — FAILS 1.4.11 (3:1)
+   * So the light-surface ring is brand.600, and dark surfaces opt into the
+   * inverted ring below (white #ffffff on navy.950 = 18.85:1).
+   *
+   * Never `outline: none` / `focus:outline-none` on a form control or any
+   * interactive element. Replace this rule centrally instead.
+   */
   :focus-visible {
     outline: 2px solid theme('colors.brand.600');
     outline-offset: 2px;
-    border-radius: 2px;
   }
 
-  /* Never let a media query or filter surface take focus styling away. */
+  /*
+   * Dark-surface variant of the same indicator. Apply `focus-ring-invert` to a
+   * single control, or `on-dark` to a dark container so every focusable
+   * descendant inherits the light ring. Same thickness, same offset, same
+   * shape — only the colour inverts, so the indicator is never ambiguous.
+   */
+  .focus-ring-invert:focus-visible,
+  .on-dark:focus-visible,
+  .on-dark :focus-visible {
+    outline-color: theme('colors.white');
+  }
+
+  /* Never let a programmatically focused (not keyboard) surface draw a ring. */
   [tabindex='-1']:focus {
     outline: none;
   }
@@ -64,14 +90,44 @@
    * Bottom-nav offset for page content. Reserved unconditionally on mobile so
    * the last card is never trapped under the fixed bar, and so the sticky
    * action bar above it has somewhere to sit (§195.2).
+   *
+   * NOTE: this class serves the FLAT bar only. The shipping bottom nav is the
+   * floating variant — use `.pb-nav-clearance` for that. Kept because the
+   * sticky action bar contract (§195.2) still describes a flat bar.
    */
   .pb-safe-nav {
     padding-bottom: calc(theme('spacing.bottom-nav') + env(safe-area-inset-bottom, 0px) + 1.5rem);
   }
 
-  @media (min-width: 768px) {
-    .pb-safe-nav {
-      padding-bottom: 4rem;
+  /*
+   * Clearance for the FLOATING (inset) bottom nav. The bar no longer sits
+   * flush with the viewport edge, so page content must clear
+   * bar height + safe-area inset + the visible gap beneath the bar. Deriving it
+   * from the same tokens the bar is built from keeps the two from drifting
+   * apart when either height changes.
+   *
+   * The name is deliberately NOT `.pb-floating-nav`. Tailwind auto-generates a
+   * `pb-*` utility from the `spacing.floating-nav` token, and a component-layer
+   * class of the same name is emitted FIRST — the utility then wins the cascade
+   * and silently replaces this rule with a bare `padding-bottom`, dropping the
+   * `env(safe-area-inset-bottom)` term at every width. There is no
+   * `spacing.nav-clearance` token, so no utility can shadow this name.
+   */
+  .pb-nav-clearance {
+    padding-bottom: calc(
+      theme('spacing.floating-nav') + env(safe-area-inset-bottom, 0px) +
+        theme('spacing.floating-nav-gap')
+    );
+  }
+
+  /*
+   * Released at the SAME breakpoint the bottom nav stops rendering, so the
+   * reserved space and the bar can never disagree. The shipping boundary is
+   * `lg` (1024px), not `md` — see `components/layout/BottomNav.jsx`.
+   */
+  @media (min-width: 1024px) {
+    .pb-nav-clearance {
+      padding-bottom: 0;
     }
   }
 

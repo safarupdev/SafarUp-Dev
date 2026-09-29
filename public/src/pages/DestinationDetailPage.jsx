@@ -31,12 +31,14 @@ import { useSeo } from '../lib/seo';
 import { formatDateOrEmpty, isAbsoluteUrl, joinUrl, toIsoString } from '../lib/format';
 import { isNotFound } from '../lib/apiClient';
 import { SITE_URL } from '../constants/site';
-import { PATHS, destinationPath, destinationsPath, placePath } from '../constants/routes';
+import { PATHS, destinationPath, destinationsPath, placePath, tripPath } from '../constants/routes';
 import { fetchDestinationBySlug } from '../api/destinations.api';
+import { SHOWCASE_NOTICE, showcaseTripsForDestination } from '../data/showcase';
 
 import SmartImage from '../components/common/SmartImage';
 import Icon from '../components/common/Icon';
 import Button from '../components/common/Button';
+import Card from '../components/common/Card';
 import Chip from '../components/common/Chip';
 import EmptyState from '../components/states/EmptyState';
 import ErrorState from '../components/states/ErrorState';
@@ -57,7 +59,13 @@ function Section({ title, id, children, description }) {
       <h2 id={id} className="font-display text-2xl font-bold tracking-tight text-navy-900">
         {title}
       </h2>
-      {description ? <p className="mt-2 max-w-prose text-sm text-navy-500">{description}</p> : null}
+      {/* `.measure`, not the prose max-width utility. Both resolve to the
+          same 68ch token today, so this is not a visual change — it is
+          removing a second spelling for one idea before the two drift. (The
+          class name is spelled out here rather than in the class string so
+          Tailwind's scanner does not keep generating the other utility from
+          this comment.) */}
+      {description ? <p className="measure mt-2 text-sm text-navy-500">{description}</p> : null}
       <div className="mt-5">{children}</div>
     </section>
   );
@@ -97,7 +105,7 @@ export default function DestinationDetailPage() {
       canonical,
       image: destination.seo?.ogImage || destination.heroImage,
       robots: null,
-      type: 'article',
+      type: 'website',
       structuredData: [
         {
           '@context': 'https://schema.org',
@@ -107,17 +115,27 @@ export default function DestinationDetailPage() {
           description: destination.seo?.description || destination.shortDescription,
           url: canonical,
           image: destination.seo?.ogImage || destination.heroImage || undefined,
-          // Places are referenced, never copied: `includesAttraction` points at
-          // the canonical place identity (PRD §173, §186).
+          /**
+           * Places are referenced by NAME only. A `url` here would point at
+           * `/places/:slug`, which has no public page yet — that route renders
+           * an explicit `noindex,follow` "not available" state with no
+           * canonical. Asserting a URL for an entity that must not be indexed
+           * tells a crawler the identity exists and simultaneously that it
+           * should be skipped, so it follows the link, lands on a placeholder
+           * and burns crawl budget. PRD §200.6 has not settled whether a Place
+           * gets a public page; until it does, no URL is invented for it.
+           */
           includesAttraction: (destination.places ?? []).map((place) => ({
             '@type': 'Place',
             name: place.name,
-            url: joinUrl(SITE_URL, placePath(place.slug)),
           })),
+          // District as a resolvable entity so "destinations in Nalanda" is a
+          // navigable, canonical relationship rather than a dangling name.
           containedInPlace: destination.district
             ? {
                 '@type': 'Place',
                 name: destination.district.name,
+                url: `${SITE_URL}${PATHS.destinations}?district=${destination.district.slug}`,
               }
             : undefined,
           datePublished: published || undefined,
@@ -201,6 +219,10 @@ export default function DestinationDetailPage() {
     icon,
     value: travelInformation?.[key],
   })).filter((row) => typeof row.value === 'string' && row.value.trim().length > 0);
+
+  // The reverse of `data/showcase.js`'s one-way `destinationSlug` link. Empty
+  // for most published destinations today, which is the correct answer.
+  const linkedTrips = showcaseTripsForDestination(destination.slug);
 
   const updatedLabel = formatDateOrEmpty(destination.updatedAt);
   const publishedLabel = formatDateOrEmpty(destination.publishedAt);
@@ -333,22 +355,59 @@ export default function DestinationDetailPage() {
                 </dl>
               </Section>
             ) : null}
-
             {/*
-              Upcoming SafarUp trips — PRD §112 empty state.
-              `GET /api/destinations/:slug/trips` is Phase 3: the `tripTemplates`
-              entity is not contracted, so the API has nothing to return. A
-              missing entity is an empty state, never an error and never a
-              fabricated result (API.destination.contract.md §2.3).
+              Upcoming SafarUp trips.
+
+              `GET /api/destinations/:slug/trips` is Phase 3: the
+              `tripTemplates` entity is not contracted, so the API has nothing
+              to return. A missing entity is an empty state, never an error
+              and never a fabricated result (API.destination.contract.md §2.3).
+
+              A showcase trip is listed here only when it names THIS
+              destination's slug in `data/showcase.js` — a link asserted in one
+              direction and verifiable against `GET /destinations`. A district
+              match, a keyword match or a hardcoded list would all fabricate a
+              trip↔destination relationship the data does not state. When the
+              lookup returns nothing, the honest empty state is shown.
             */}
             <Section title="Upcoming SafarUp trips" id="upcoming-trips">
-              <EmptyState
-                icon="route"
-                title="No trips are scheduled for this destination yet."
-                description="When SafarUp schedules a departure here, it will appear on this page — or ask us to build one around you."
-                action="Plan a Private Trip"
-                actionTo={PATHS.planTrip}
-              />
+              {linkedTrips.length > 0 ? (
+                <>
+                  <ul className="grid gap-5 sm:grid-cols-2">
+                    {linkedTrips.map((trip) => (
+                      <Card as="li" key={trip.slug} variant="inset" pad="md">
+                        <p className="text-xs font-bold uppercase tracking-wider text-navy-500">
+                          {SHOWCASE_NOTICE.title}
+                        </p>
+                        <h3 className="mt-2 font-display text-lg font-bold tracking-tight text-navy-900">
+                          <Link
+                            to={tripPath(trip.slug)}
+                            className="rounded hover:text-brand-700 focus-visible:underline"
+                          >
+                            {trip.title}
+                          </Link>
+                        </h3>
+                        <p className="mt-2 text-sm leading-relaxed text-navy-600">{trip.subtitle}</p>
+                        <p className="mt-3 text-xs leading-relaxed text-navy-500">
+                          {SHOWCASE_NOTICE.body}
+                        </p>
+                      </Card>
+                    ))}
+                  </ul>
+                  <p className="mt-4 text-sm text-navy-500">
+                    Trip itineraries are still being published, so no departures, dates or prices are
+                    listed. A private trip on this route can be requested today.
+                  </p>
+                </>
+              ) : (
+                <EmptyState
+                  icon="route"
+                  title="No trips are scheduled for this destination yet."
+                  description="When SafarUp schedules a departure here, it will appear on this page — or ask us to build one around you."
+                  action="Plan a Private Trip"
+                  actionTo={PATHS.planTrip}
+                />
+              )}
             </Section>
 
             {/*

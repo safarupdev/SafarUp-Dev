@@ -5,6 +5,7 @@ import { SITE_NAME, SITE_TAGLINE } from '../../constants/site';
 
 const FOOTER_GROUPS = [
   {
+    id: 'explore',
     heading: 'Explore',
     links: [
       { label: 'Destinations', to: PATHS.destinations },
@@ -13,6 +14,7 @@ const FOOTER_GROUPS = [
     ],
   },
   {
+    id: 'plan',
     heading: 'Plan',
     links: [
       { label: 'Plan a Private Trip', to: PATHS.planTrip },
@@ -26,8 +28,17 @@ const FOOTER_GROUPS = [
  * Site footer.
  *
  * Carries the internal links that make the public graph crawlable
- * (PRD §172). `nav` elements are labelled so the three navigation landmarks
- * on a page — header, footer, bottom bar — are individually addressable.
+ * (PRD §172), including the reserved routes that the primary navigation
+ * deliberately leaves out — `/blog`, `/dashboard/bookings` and `/login` are
+ * all reachable from here, so nothing is unreachable and nothing unbuilt is
+ * given primary-nav weight.
+ *
+ * The group labels are `<p>`, not headings. Three `<h2>`s per page put footer
+ * furniture into the document outline of every route, and a screen-reader user
+ * paging by heading would meet "Explore", "Plan" and "Start planning" as if
+ * they were sections of the page. The `nav` landmarks name themselves with
+ * `aria-labelledby` instead, so each is still individually addressable
+ * alongside the header nav and the bottom bar.
  */
 export default function SiteFooter() {
   return (
@@ -43,8 +54,13 @@ export default function SiteFooter() {
           </div>
 
           {FOOTER_GROUPS.map((group) => (
-            <nav key={group.heading} aria-label={group.heading}>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-navy-400">{group.heading}</h2>
+            <nav key={group.id} aria-labelledby={`footer-group-${group.id}`}>
+              <p
+                id={`footer-group-${group.id}`}
+                className="text-xs font-bold uppercase tracking-wider text-navy-400"
+              >
+                {group.heading}
+              </p>
               <ul className="mt-3 space-y-2.5">
                 {group.links.map((link) => (
                   <li key={link.label}>
@@ -61,7 +77,7 @@ export default function SiteFooter() {
           ))}
 
           <div className="space-y-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-navy-400">Start planning</h2>
+            <p className="text-xs font-bold uppercase tracking-wider text-navy-400">Start planning</p>
             <p className="text-sm leading-relaxed text-navy-300">
               Tell us where and when. Our team builds the rest.
             </p>
