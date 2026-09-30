@@ -26,6 +26,9 @@ import ConfirmDialog from '../common/ConfirmDialog';
 import { useLifecycle } from '../../hooks/useLifecycle';
 import { getErrorMessage } from '../../lib/apiClient';
 
+import Card from '../common/Card';
+import Icon from '../common/Icon';
+
 const STATUS_TARGET = { publish: 'PUBLISHED', unpublish: 'DRAFT', archive: 'ARCHIVED' };
 
 /**
@@ -128,80 +131,94 @@ export default function LifecyclePanel({
     : null;
 
   return (
-    <section aria-labelledby="lifecycle-heading" className="rounded-lg border border-slate-200 bg-white p-5">
-      <h2 id="lifecycle-heading" className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+    <Card as="section" variant="surface" pad="md" aria-labelledby="lifecycle-heading">
+      <h2 id="lifecycle-heading" className="text-xs font-bold uppercase tracking-wider text-navy-950">
         Lifecycle &amp; visibility
       </h2>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="text-sm text-slate-600">Current status</span>
+        <span className="text-xs text-slate-600 font-medium">Current status:</span>
         <StatusBadge status={status} />
         {supportsFeature && (
-          <span className="text-sm text-slate-600">
+          <span className="text-xs text-slate-600 ml-2">
             Homepage featured:{' '}
-            <span className="font-medium text-slate-800">{featured ? 'Yes' : 'No'}</span>
+            <span className="font-semibold text-navy-900">{featured ? 'Yes' : 'No'}</span>
           </span>
         )}
       </div>
 
-      <p className="mt-2 text-sm text-slate-500">
+      <p className="mt-2 text-xs text-slate-500">
         Only <span className="font-medium text-slate-700">PUBLISHED</span> content is readable without
         authentication (PRD §63). These actions change what the public internet can see, so each one asks
         for confirmation first.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button disabled={!canPublish || lifecycle.isPending} onClick={() => request('publish')}>
-          Publish
+        <Button
+          variant="accent"
+          size="sm"
+          disabled={!canPublish || lifecycle.isPending}
+          onClick={() => request('publish')}
+        >
+          <Icon name="check" className="h-3.5 w-3.5" />
+          <span>Publish</span>
         </Button>
         <Button
           variant="secondary"
+          size="sm"
           disabled={!canUnpublish || lifecycle.isPending}
           onClick={() => request('unpublish')}
         >
           Unpublish
         </Button>
         <Button
-          variant="secondary"
+          variant="danger"
+          size="sm"
           disabled={!canArchive || lifecycle.isPending}
           onClick={() => request('archive')}
         >
-          Archive
+          <Icon name="trash" className="h-3.5 w-3.5" />
+          <span>Archive</span>
         </Button>
 
         {supportsFeature && (
           <Button
             variant="secondary"
+            size="sm"
             disabled={featureBlocked || lifecycle.isPending}
             onClick={() => request('feature', !featured)}
             aria-describedby="feature-help"
           >
-            {featured ? 'Remove from featured' : 'Feature on homepage'}
+            <Icon name="star" className={`h-3.5 w-3.5 ${featured ? 'text-amber-500 fill-amber-500' : ''}`} />
+            <span>{featured ? 'Remove from featured' : 'Feature on homepage'}</span>
           </Button>
         )}
       </div>
 
       {featureBlocked && (
-        <p id="feature-help" className="mt-2 text-sm text-amber-800">
+        <p id="feature-help" className="mt-2 text-xs text-amber-800">
           Featuring is only available while this {entityLabel} is PUBLISHED — a draft or archived{' '}
           {entityLabel} must never appear in a public featured rail (PRD §22). Publish it first.
         </p>
       )}
       {supportsFeature && !featureBlocked && (
-        <p id="feature-help" className="mt-2 text-sm text-slate-500">
+        <p id="feature-help" className="mt-2 text-xs text-slate-500">
           Featured {entityLabel}s appear in the homepage “Popular Destinations” rail (PRD §18).
         </p>
       )}
 
       {feedback && (
-        <p
+        <div
           role="status"
-          className={`mt-3 rounded-md px-3 py-2 text-sm ${
-            feedback.tone === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'
+          className={`mt-3 flex items-center gap-2 rounded-md p-2.5 text-xs ${
+            feedback.tone === 'success'
+              ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200'
+              : 'bg-rose-50 text-rose-800 ring-1 ring-rose-200'
           }`}
         >
-          {feedback.message}
-        </p>
+          <Icon name={feedback.tone === 'success' ? 'check' : 'alert'} className="h-4 w-4 flex-none" />
+          <span>{feedback.message}</span>
+        </div>
       )}
 
       <ConfirmDialog
@@ -215,7 +232,7 @@ export default function LifecyclePanel({
         onConfirm={confirm}
         onCancel={closeDialog}
       />
-    </section>
+    </Card>
   );
 }
 

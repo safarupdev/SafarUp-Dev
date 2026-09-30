@@ -1,22 +1,32 @@
 /**
- * Table skeleton — DESIGN_SYSTEM §10 ("skeletons over spinners for content
- * that is known to arrive"). Reserves the row height so the table does not
- * jump when data lands, and announces itself politely to screen readers.
+ * Table Skeleton — DESIGN_SYSTEM.md §10 ("skeletons over spinners for content that is known to arrive").
  */
 
-export default function TableSkeleton({ rows = 5, columns = 4 }) {
+export default function TableSkeleton({ rows = 6, columns = 5 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white" aria-busy="true">
+    <div
+      className="overflow-hidden rounded-lg border border-slate-200/90 bg-white shadow-card"
+      aria-busy="true"
+    >
       <span className="sr-only">Loading content…</span>
       <table className="w-full table-fixed border-collapse">
-        <tbody>
+        <thead>
+          <tr className="border-b border-slate-200 bg-slate-50">
+            {Array.from({ length: columns }).map((_, i) => (
+              <th key={i} className="px-3.5 py-3">
+                <div className="skeleton h-3 w-3/4" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
           {Array.from({ length: rows }).map((_, rowIndex) => (
-            <tr key={rowIndex} className="border-b border-slate-100 last:border-0">
+            <tr key={rowIndex}>
               {Array.from({ length: columns }).map((__, colIndex) => (
-                <td key={colIndex} className="px-4 py-3">
+                <td key={colIndex} className="px-3.5 py-3">
                   <div
-                    className={`h-3 animate-pulse rounded bg-slate-100 ${
-                      colIndex === 0 ? 'w-2/3' : 'w-1/2'
+                    className={`skeleton h-3.5 ${
+                      colIndex === 0 ? 'w-4/5' : colIndex === columns - 1 ? 'w-1/3' : 'w-1/2'
                     }`}
                   />
                 </td>

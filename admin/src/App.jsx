@@ -14,6 +14,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { queryClient } from './lib/queryClient';
 import { AuthProvider } from './context/AuthContext';
+import { SidebarProvider } from './context/SidebarContext';
 import { ROLES } from './constants/roles';
 
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -35,13 +36,15 @@ import CategoryListPage from './pages/categories/CategoryListPage';
 import CategoryFormPage from './pages/categories/CategoryFormPage';
 import PlaceListPage from './pages/places/PlaceListPage';
 import PlaceFormPage from './pages/places/PlaceFormPage';
+import SettingsPage from './pages/settings/SettingsPage';
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
+          <SidebarProvider>
+            <Routes>
             {/* Public (unauthenticated) routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -117,7 +120,7 @@ function App() {
                 </Route>
 
                 <Route element={<ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPER_ADMIN]} />}>
-                  <Route path="/settings" element={<ComingSoonPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
                 </Route>
 
                 <Route element={<ProtectedRoute allowedRoles={[ROLES.SUPER_ADMIN]} />}>
@@ -129,10 +132,11 @@ function App() {
             <Route path="/404" element={<NotFoundPage />} />
             <Route path="*" element={<Navigate to="/404" replace />} />
           </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
-  );
+        </SidebarProvider>
+      </AuthProvider>
+    </BrowserRouter>
+  </QueryClientProvider>
+);
 }
 
 export default App;

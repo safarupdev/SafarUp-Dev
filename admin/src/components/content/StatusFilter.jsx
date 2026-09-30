@@ -27,8 +27,8 @@ export default function StatusFilter({ value, onChange, id = 'status-filter' }) 
               type="button"
               aria-pressed={isActive}
               onClick={() => onChange(option.value)}
-              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
-                isActive ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+              className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
+                isActive ? 'bg-[#0e1726] text-white shadow-xs' : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'
               }`}
             >
               {option.label}

@@ -1,18 +1,23 @@
 /**
- * Link styled as a Button.
+ * Link styled as a Button — DESIGN_SYSTEM.md §6.
  *
- * A router <Link> renders an <a>, and a <button> inside an <a> is invalid
- * interactive nesting with poor keyboard and screen-reader behaviour
- * (DESIGN_SYSTEM §9). This gives navigation the exact Button appearance
- * without nesting two interactive elements.
+ * Renders an accessible router <Link> while sharing the exact Button styling,
+ * avoiding invalid interactive element nesting (<button> inside <a>).
  */
 
 import { Link } from 'react-router-dom';
 import { buttonClassName } from './Button';
 
-export default function LinkButton({ to, variant = 'primary', className = '', children, ...rest }) {
+export default function LinkButton({
+  to,
+  variant = 'primary',
+  size = 'md',
+  className = '',
+  children,
+  ...rest
+}) {
   return (
-    <Link to={to} className={buttonClassName(variant, className)} {...rest}>
+    <Link to={to} className={buttonClassName(variant, className, size)} {...rest}>
       {children}
     </Link>
   );
