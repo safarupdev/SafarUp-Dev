@@ -9,8 +9,11 @@
 
 import { Link } from 'react-router-dom';
 
+// min-h-11 = 44px. Chips are the primary interactive control in the mobile
+// filter bar, and 44px is the DESIGN_SYSTEM §9 touch-target floor; min-h-11
+// (36px) was below it.
 const BASE =
-  'inline-flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium ring-1 ring-inset transition-colors duration-150 ease-standard';
+  'inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium ring-1 ring-inset transition-colors duration-150 ease-standard';
 
 const TONE = {
   active: 'bg-navy-900 text-white ring-navy-900',

@@ -11,17 +11,37 @@
 import { Link } from 'react-router-dom';
 
 const VARIANTS = {
+  // White on accent-600 #ea580c is 3.56:1 — below the 4.5:1 AA threshold for
+  // body-size text, so a primary CTA was failing AA. accent-700 #c2410c is
+  // 5.18:1 and passes. Hover steps one deeper (accent-800, 7.31:1).
   primary:
-    'bg-accent-600 text-white shadow-sm hover:bg-accent-700 active:bg-accent-800 disabled:bg-navy-200 disabled:text-navy-500',
+    'bg-accent-700 text-white shadow-sm hover:bg-accent-800 active:bg-accent-900 disabled:bg-navy-200 disabled:text-navy-500',
+  // brand-600 #1d4ed8 on white is 6.70:1 — passes AA, unchanged.
   brand: 'bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-700 disabled:bg-navy-200 disabled:text-navy-500',
   secondary:
-    'bg-white text-navy-900 ring-1 ring-inset ring-navy-200 shadow-sm hover:bg-navy-50 active:bg-navy-100 disabled:text-navy-400',
-  ghost: 'text-brand-700 hover:bg-navy-50 active:bg-navy-100 disabled:text-navy-400',
+    'bg-white text-navy-900 ring-1 ring-inset ring-navy-200 shadow-sm hover:bg-navy-50 active:bg-navy-100 disabled:text-navy-500',
+  ghost: 'text-brand-700 hover:bg-navy-50 active:bg-navy-100 disabled:text-navy-500',
+  // Secondary CTA on a dark surface (hero, footer CTA band).
+  //
+  // This exists because pages used to reach for `variant="secondary"` plus a
+  // `className` of `bg-transparent text-white ring-white/30`. That silently
+  // broke: `secondary` already sets `bg-white` and `text-navy-900`, and
+  // Tailwind resolves two competing `background-color`/`color` utilities by
+  // STYLESHEET order, not by the order they appear in `className`. The result
+  // was `bg-white` winning the background while `text-white` won the text —
+  // a solid white pill with white text, i.e. an invisible label on the two
+  // most important CTAs on the site. Callers must not be able to reach that
+  // state by overriding `secondary`, so the dark-surface treatment is its own
+  // variant instead of a set of overrides.
+  onDark:
+    'bg-transparent text-white ring-1 ring-inset ring-white/45 hover:bg-white/10 hover:ring-white/70 active:bg-white/15 focus-visible:ring-white',
 };
 
 const SIZES = {
-  // `md` is the minimum comfortable touch target on mobile (DESIGN_SYSTEM §9).
-  sm: 'min-h-9 px-3.5 text-sm',
+  // 44px (min-h-11) is the floor for every size that can be a touch target on
+  // mobile (DESIGN_SYSTEM §9). `sm` used to be 36px, which fails it, and it is
+  // the only header action on mobile. `sm`/`md` are now 44px; `lg` is larger.
+  sm: 'min-h-11 px-4 text-sm',
   md: 'min-h-11 px-5 text-[0.95rem]',
   lg: 'min-h-12 px-6 text-base',
 };

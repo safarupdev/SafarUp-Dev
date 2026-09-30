@@ -93,11 +93,37 @@ export default {
         // DESIGN_SYSTEM.md §5: bottom nav height, so content can reserve
         // exactly this much space and the two never collide (§195.2).
         'bottom-nav': '4.5rem',
+        // Floating (inset) bottom nav: same bar height as `bottom-nav`, so the
+        // two navs are interchangeable, but the bar no longer sits flush with
+        // the viewport edge.
+        'floating-nav': '4.5rem',
+        // The visible gap between the floating bar and the bottom of the
+        // viewport. Content clearance must include it (see `.pb-floating-nav`
+        // in src/index.css) or the last element sits under the gap, not under
+        // the bar, and looks clipped.
+        'floating-nav-gap': '1.25rem',
+      },
+      borderRadius: {
+        // Card radius, normalised. §7 of the task: the same card object was
+        // being re-implemented with three different radii.
+        card: '1rem',
       },
       boxShadow: {
         card: '0 1px 2px 0 rgb(19 28 43 / 0.04), 0 8px 24px -12px rgb(19 28 43 / 0.18)',
         'card-hover': '0 2px 4px 0 rgb(19 28 43 / 0.06), 0 18px 40px -16px rgb(19 28 43 / 0.28)',
         nav: '0 -1px 0 0 rgb(19 28 43 / 0.08)',
+        // Floating nav sits *above* the viewport edge and over page content, so
+        // it needs an all-side lift, not the flat top-edge hairline above.
+        'floating-nav':
+          '0 -4px 16px -6px rgb(10 17 32 / 0.18), 0 12px 40px -12px rgb(10 17 32 / 0.35)',
+        // Floating / glass controls that are not the nav itself.
+        float: '0 8px 32px -10px rgb(10 17 32 / 0.28)',
+      },
+      backdropBlur: {
+        // Named so glass has one value everywhere: nav, floating buttons and
+        // overlays all read as the same material (2026 direction: glass is
+        // intentional, not decorative — see DESIGN_SYSTEM.md §13).
+        glass: '1rem',
       },
       transitionTimingFunction: {
         // Small, standard curve. DESIGN_SYSTEM.md §8 motion scale.

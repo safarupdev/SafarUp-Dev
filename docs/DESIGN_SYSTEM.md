@@ -97,6 +97,34 @@ Semantic heading hierarchy is a **Discovery requirement** (§172), not only a vi
 
 State components are mandatory, not optional (§72, §112). Every data-backed surface has all three.
 
+### 6.1 Card — the single card recipe
+
+`public/src/components/common/Card.jsx`. The same "raised white box holding one topic" object was previously re-implemented three ways across pages with three different radii and paddings. **Use `Card`; do not hand-roll a card.**
+
+| Prop | Values | Recipe | Use for |
+|---|---|---|---|
+| `variant` | `surface` (default) | `bg-white ring-1 ring-navy-100 shadow-card` | Real content: destination/trip cards, detail panels, summary blocks |
+| | `outline` | `bg-white border border-navy-100`, no shadow | A card inside another card, or beside a `surface` card where two shadows would compete |
+| | `inset` | `border border-dashed border-navy-200 bg-navy-50/40` | **Placeholder regions only** — upcoming trips, empty lists, "coming soon" |
+| `pad` | `none` \| `sm` \| `md` (default) \| `lg` | `p-4` / `p-5` / `p-6 sm:p-8` | Normalised padding; never hand-written per card |
+| `hover` | boolean | adds `hover:shadow-card-hover focus-within:shadow-card-hover` | Interactive cards only |
+| `as` / `to` | `'link'` + `to` | renders `<Link>` | Whole-card link — one tab stop, title remains the link text |
+
+Radius is `rounded-card` (`borderRadius.card = 1rem`) for every variant. The component is a thin wrapper over existing Tailwind utilities: no CSS-in-JS, no runtime styling, no new CSS system — removing it would change no visual behaviour.
+
+A dashed edge must never wrap real content; `inset` is the only dashed option in the system.
+
+### 6.2 Floating nav clearance
+
+Mobile global navigation is a **floating** (inset, glassmorphic) bar, not a full-width flush bar (§5). Because it floats above the viewport edge, content must clear **bar height + safe-area inset + the visible gap beneath the bar** — not just the bar height.
+
+| Utility | Formula | Use |
+|---|---|---|
+| `.pb-safe-nav` | `bottom-nav` + `safe-area-inset-bottom` + `1.5rem` | Existing flat-bar pages — **still supported, do not remove** |
+| `.pb-floating-nav` | `floating-nav` + `safe-area-inset-bottom` + `floating-nav-gap` | Pages under the floating bar |
+
+Both are defined once in `src/index.css` (`@layer components`) and are derived from the `spacing` tokens the bar itself is built from, so the bar and its clearance cannot drift apart. Reserved unconditionally on mobile so the last card is never trapped under the bar and the sticky action bar has somewhere to sit (§195.2).
+
 ---
 
 ## 7. Interaction states
@@ -104,6 +132,41 @@ State components are mandatory, not optional (§72, §112). Every data-backed su
 Every interactive component defines: **hover · active · focus · disabled · loading · success · error · empty**.
 
 Focus must be visible and keyboard-reachable (§83). Colour is never the only carrier of state.
+
+### 7.1 Focus ring — one rule, centrally defined
+
+The focus indicator is defined **once**, in `public/src/index.css` in `@layer base`, as a 2px `outline` at 2px offset. `outline`, not `box-shadow`, so it survives forced-colours mode and never collides with a component's `shadow-*` / `ring-*`.
+
+| Surface | Ring colour | Measured ratio | Requirement |
+|---|---|---|---|
+| Light (`#ffffff`) | `brand-600` `#1d4ed8` | **6.70:1** | 1.4.11 needs 3:1 — passes |
+| Dark (`navy-950` `#0a1120`) | `#ffffff` (inverted) | **18.85:1** | 1.4.11 needs 3:1 — passes |
+
+`brand-600` on `navy-950` is only **2.81:1** and failed 1.4.11, so the dark case is handled by an explicit inverted variant — same thickness, offset and shape, colour only:
+
+- `focus-ring-invert` — on a single control inside a dark surface.
+- `on-dark` — on a dark **container**; every focusable descendant inherits the light ring.
+
+> **Do not use `focus:outline-none` (or `outline: none`) on any form control or interactive element to remove the ring.** Several pages did this to suppress the ring on inputs; that is a WCAG 1.4.11 failure, not a style choice. To change the indicator, change the single rule in `index.css`. The only permitted removal is `[tabindex="-1"]:focus`, which covers programmatic focus targets that are not interactive.
+
+### 7.2 Touch targets — 44px floor
+
+**Every interactive control is at least 44 × 44 CSS px** (WCAG 2.5.5 / DESIGN_SYSTEM §9). In Tailwind that is `min-h-11`.
+
+| Control | Before | Now |
+|---|---|---|
+| `Button` `size="sm"` (the only header action on mobile) | `min-h-9` (36px) — **fail** | `min-h-11` (44px) |
+| `Chip` (mobile filter chips — a primary touch control) | `min-h-9` (36px) — **fail** | `min-h-11` (44px) |
+| `Button` `size="md"` | `min-h-11` | unchanged |
+| `Button` `size="lg"` | `min-h-12` | unchanged |
+
+A dense chip row may be visually tight, but the target is the target — reduce gap and horizontal padding, never the height.
+
+### 7.3 Primary CTA contrast
+
+`text-white` on **`accent-700` `#c2410c` = 5.18:1** — passes AA for body text (4.5:1). Hover steps one deeper to `accent-800` `#9a3412` = 7.31:1, active to `accent-900`.
+
+The previous `accent-600` `#ea580c` was **3.56:1** and failed AA at every button size. No new ramp step was added; an existing step that already passed was selected. `brand-600` on white is 6.70:1 and was left alone.
 
 ---
 
@@ -170,11 +233,32 @@ This document is **evolving**. Reusable patterns discovered during implementatio
 
 ---
 
+## 13. Visual direction (2026 refinement)
+
+The brand direction is unchanged — **deep navy + warm orange + clean whites**. This section refines how it is *composed*, so the app reads premium rather than merely competent. Refinement, not replacement: no new hue enters the ramp.
+
+| Quality | Rule |
+|---|---|
+| **Cinematic** | One dominant image or one dominant focal point per screen. Imagery is full-bleed or generously cropped, never a small inset thumbnail in a box of padding. Gradient overlays (`navy-950` → transparent) rather than flat scrims. |
+| **Editorial** | `display` serif for headings, system sans for UI and body. Asymmetric layouts; a wide gutter and a narrow measure beat an even two-column split. Generous line-height on long-form travel copy. |
+| **Warm** | Orange appears at a **single focal point per screen** — the primary CTA, or the featured badge, never both fighting. It is the accent, not the surface. |
+| **Spacious** | Outer padding ≥ `p-6` on mobile and `p-8`+ on desktop. Section rhythm in multiples of `p-12`. A crowded premium page is a defect. |
+| **Restrained motion** | Motion confirms causality and shows hierarchy, nothing else (§8). 150–220ms, `ease-standard`. No parallax, no scroll-jacking, no decorative loops. `prefers-reduced-motion` is implemented and must not be weakened (§8). |
+| **Intentional glass** | Glassmorphism — `backdrop-blur-glass`, translucency, `shadow-float` — is used **only** for navigation, floating action controls and overlays: surfaces that genuinely sit above other content. Glass on every card turns the page into soup and costs paint performance (§10). |
+
+Tokens supporting the above: `rounded-card`, `shadow-card` / `card-hover` / `float` / `floating-nav`, `backdrop-blur-glass`, `spacing.floating-nav` / `floating-nav-gap`, `maxWidth.prose` / `shell`.
+
+Motion, glass and shadow are *additive layers on top of* the primitives in §6 — never a substitute for them. When in doubt, use `Card`.
+
+---
+
 ## 12. Open items
 
 | Item | Status |
 |---|---|
-| Exact hex/ramp values for navy and orange | To be fixed at first implementation and recorded here |
+| Exact hex/ramp values for navy and orange | **Fixed** — recorded in `public/tailwind.config.js` (`navy-50…950`, `accent-50…900`) and carried identically by `admin/`. See §2.1 |
+| Card primitive adoption across pages | `Card.jsx` exists and is authoritative (§6.1); page-by-page adoption in progress |
+| `focus:outline-none` removal from form controls | Central rule fixed (§7.1); removal from individual pages in progress |
 | **Public app has no Tailwind, router, or design tokens** | **Phase 2 prerequisite.** The public app is currently a 10-line scaffold with only `react` and `react-dom`. Tailwind, a router, and an API client must be established — and this document's tokens applied — before any public UI is built |
 | Component inventory vs. the real implementation | Refined as pages are built |
 

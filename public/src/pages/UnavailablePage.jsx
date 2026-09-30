@@ -28,7 +28,7 @@ export default function UnavailablePage({ title, message }) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col items-center gap-6 px-4 py-24 text-center sm:px-6">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-50 text-accent-600 ring-1 ring-accent-100">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-50 text-accent-700 ring-1 ring-accent-100">
         <Icon name="route" className="h-7 w-7" />
       </span>
       <div className="space-y-3">

@@ -267,7 +267,9 @@ async function resolveCategoryId(categorySlug) {
 async function getPublicBySlug(slug) {
   const destination = await destinationRepository.findPublished(slug);
   if (!destination) return null;
-  const relations = await destinationRepository.resolveRelations(destination);
+  const relations = await destinationRepository.resolveRelations(destination, {
+    publishedOnly: true,
+  });
   return toPublicPayload(destination, relations);
 }
 

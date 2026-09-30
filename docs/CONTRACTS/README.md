@@ -46,8 +46,15 @@ A contract rejected at review returns to `DRAFT`. The contract — not each cons
 | `FIRESTORE.destination.contract.md` | **`APPROVED`** | 2026-09-29 |
 | `FIRESTORE.place.contract.md` | **`APPROVED`** | 2026-09-29 |
 | `REPOSITORY_ARCHITECTURE.contract.md` | **`APPROVED`** | 2026-09-29 |
+| `API.taxonomy.contract.md` | **`APPROVED`** | 2026-09-29 |
+| `API.auth.contract.md` | **`APPROVED`** | 2026-09-29 |
 
 All Phase 2 contracts passed the four-Master review. **Phase 2 entry gate is closed** (PRD §182.2).
+
+**Retroactive contracts.** `API.taxonomy` and `API.auth` describe routers that were
+already implemented and tested before this repository listed them. They were written to
+close a contract-coverage gap, not to author new behaviour: where a document and
+`backend/src/routes/` disagree, the code is correct and the document is wrong.
 
 **Substantive changes made during review** — these were blocking, not cosmetic:
 

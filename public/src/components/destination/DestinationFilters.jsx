@@ -48,7 +48,7 @@ export default function DestinationFilters({ districts, categories, activeDistri
           <button
             type="button"
             onClick={() => apply(new URLSearchParams())}
-            className="min-h-9 rounded-full px-3 text-sm font-semibold text-brand-700 transition-colors hover:bg-navy-50"
+            className="min-h-11 rounded-full px-3 text-sm font-semibold text-brand-700 transition-colors hover:bg-navy-50"
           >
             Clear all
           </button>

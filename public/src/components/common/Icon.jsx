@@ -46,6 +46,19 @@ const ICONS = {
     'M12 3c2.3 2.5 3.4 5.5 3.4 9s-1.1 6.5-3.4 9c-2.3-2.5-3.4-5.5-3.4-9S9.7 5.5 12 3Z',
   ],
   chevronDown: ['m6.5 9.5 5.5 5.5 5.5-5.5'],
+  // Added for the Trip Detail experience (inclusions/exclusions, quick
+  // facts, meals, demo-data notice). Same 24x24 stroke weight as the rest.
+  check: ['m4.5 12.5 5 5 10-11'],
+  minus: ['M6 12h12'],
+  info: ['M12 16.5v-4.2M12 8.3h.01', 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z'],
+  clock: ['M12 6.8V12l3.2 2', 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z'],
+  users: [
+    'M9 11.5a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z',
+    'M2.5 20.5a6.5 6.5 0 0 1 13 0',
+    'M16.5 4.4a3.75 3.75 0 0 1 0 7.2',
+    'M18 14.6a6.5 6.5 0 0 1 3.5 5.9',
+  ],
+  star: ['M12 3.6l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.8l5.9-.9L12 3.6Z'],
 };
 
 /**

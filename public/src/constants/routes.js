@@ -16,19 +16,28 @@ export const PATHS = {
   trips: '/trips',
   blog: '/blog',
   planTrip: '/plan-trip',
+  about: '/about',
+  explore: '/explore',
   login: '/login',
   dashboardBookings: '/dashboard/bookings',
 };
 
 export const destinationPath = (slug) => joinUrl(PATHS.destinations, slug);
+export const tripPath = (slug) => joinUrl(PATHS.trips, slug);
 
 /**
  * RESERVED, `noindex`. `/places/:slug` is NOT part of PRD §17 — whether a
  * Place has its own public page and what its indexability is, is an
- * unresolved decision (PRD §200.6, §200.9). The path exists only so that
- * "Places to visit" can link to a real route instead of a dead one; the route
- * renders an explicit "not published yet" state and must not be indexed until
- * §200.6 settles. Delete it if the decision goes the other way.
+ * unresolved decision (PRD §200.6, §200.9). The route renders an explicit
+ * "not available yet" state and must not be indexed until §200.6 settles.
+ *
+ * `placePath` is exported for that route but is deliberately UNUSED by the
+ * pages. A Place is a stop inside a journey, not a standalone product, so
+ * "Places to visit" chips are non-linking and the `includesAttraction`
+ * structured data carries names with no `url`. Linking here would assert an
+ * indexable Place identity that contradicts both the `noindex` route and the
+ * name-only structured data. Delete this helper with the route if §200.6
+ * decides a Place gets no public page.
  */
 export const placePath = (slug) => joinUrl(PATHS.places, slug);
 

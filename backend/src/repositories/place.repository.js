@@ -20,6 +20,7 @@ const {
   patchById,
   patchWithAudit,
   resolveMany,
+  resolvePublishedMany,
   toEntities,
   toEntity,
   clampLimit,
@@ -96,6 +97,19 @@ async function getMany(ids) {
   return resolveMany(COLLECTION, ids);
 }
 
+/**
+ * Place resolution for PUBLIC read paths.
+ *
+ * `getMany` stays unfiltered because the Admin CMS must resolve a reference
+ * to a DRAFT or ARCHIVED Place. Public payloads must not: an ARCHIVED Place
+ * was previously resolved by name and slug into destination pages and
+ * `includesAttraction` JSON-LD. Filtering lives in the data-access layer so
+ * every public caller is protected by construction.
+ */
+async function getManyPublished(ids) {
+  return resolvePublishedMany(COLLECTION, ids);
+}
+
 async function findPublished(slug) {
   return findPublishedBySlug(COLLECTION, slug);
 }
@@ -140,6 +154,7 @@ module.exports = {
   create,
   get,
   getMany,
+  getManyPublished,
   findPublished,
   findOneBySlug,
   list,
