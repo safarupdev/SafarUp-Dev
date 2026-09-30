@@ -103,6 +103,7 @@ export default function DistrictListPage() {
         isLoading={query.isLoading}
         error={query.error}
         onRetry={query.refetch}
+        paginated={false}
         caption="Districts, most recently updated first"
         empty={{
           title: status ? `No ${status.toLowerCase()} districts` : 'No districts yet',

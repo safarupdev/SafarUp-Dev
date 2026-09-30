@@ -12,17 +12,22 @@ export function Wordmark({ tone = 'light' }) {
   return (
     <Link
       to={PATHS.home}
-      className="inline-flex items-center gap-2 rounded text-lg font-extrabold tracking-tight"
+      className="inline-flex items-center gap-2.5 rounded text-lg font-extrabold tracking-tight"
     >
-      <span
-        aria-hidden="true"
-        className={`flex h-8 w-8 items-center justify-center rounded-lg text-base font-black text-white ${
-          tone === 'light' ? 'bg-navy-900' : 'bg-accent-700'
-        }`}
-      >
-        S
+      <div className="h-8 w-8 overflow-hidden rounded-lg bg-white ring-1 ring-slate-200/80 shadow-2xs flex-none">
+        <img
+          src="/safarup-logo.jpg"
+          alt="SafarUp Logo"
+          className="h-full w-full object-contain p-0.5"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      </div>
+      <span className={tone === 'light' ? 'text-navy-900' : 'text-white'}>
+        <span className="text-[#0d1b3e]">Safar</span>
+        <span className="text-[#f26522]">Up</span>
       </span>
-      <span className={tone === 'light' ? 'text-navy-900' : 'text-white'}>SafarUp</span>
     </Link>
   );
 }

@@ -1,27 +1,27 @@
 /**
  * Editor section — the structural unit of every content form.
  *
- * PRD §199 (principle) and DESTINATION.domain.contract.md §7: content is
- * edited as **structured field-level sections, never one giant text field**.
- * Each section renders a real heading so the form's document structure is
- * navigable (§3: semantic heading hierarchy is a discovery requirement).
+ * PRD §199 and DESTINATION.domain.contract.md §7: structured field-level sections,
+ * styled using Card primitive with semantic headings.
  */
+
+import Card from '../common/Card';
 
 export default function FormSection({ title, description, children, actions, id }) {
   const headingId = id ? `${id}-heading` : undefined;
 
   return (
-    <section aria-labelledby={headingId} className="rounded-lg border border-slate-200 bg-white p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <Card as="section" variant="surface" pad="md" aria-labelledby={headingId}>
+      <div className="mb-4 flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
         <div>
-          <h2 id={headingId} className="text-sm font-semibold uppercase tracking-wide text-slate-700">
+          <h2 id={headingId} className="text-xs font-bold uppercase tracking-wider text-navy-950">
             {title}
           </h2>
-          {description && <p className="mt-1 max-w-2xl text-sm text-slate-500">{description}</p>}
+          {description && <p className="mt-0.5 max-w-2xl text-xs text-slate-500">{description}</p>}
         </div>
         {actions}
       </div>
       <div className="flex flex-col gap-4">{children}</div>
-    </section>
+    </Card>
   );
 }

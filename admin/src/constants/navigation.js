@@ -21,9 +21,11 @@ export const NAV_SECTIONS = [
   {
     label: 'Dashboard',
     path: '/',
+    icon: 'dashboard',
   },
   {
     label: 'Trips',
+    icon: 'route',
     children: [
       { label: 'Trip Templates', path: '/trips/templates' },
       { label: 'Departures', path: '/trips/departures' },
@@ -33,6 +35,7 @@ export const NAV_SECTIONS = [
   },
   {
     label: 'Private Trips',
+    icon: 'briefcase',
     children: [
       { label: 'Requests', path: '/private-trips/requests' },
       { label: 'Proposals', path: '/private-trips/proposals' },
@@ -41,6 +44,7 @@ export const NAV_SECTIONS = [
   },
   {
     label: 'Bookings',
+    icon: 'ticket',
     children: [
       { label: 'All', path: '/bookings' },
       { label: 'Pending', path: '/bookings/pending' },
@@ -49,14 +53,13 @@ export const NAV_SECTIONS = [
       { label: 'Completed', path: '/bookings/completed' },
     ],
   },
-  { label: 'Customers', path: '/customers' },
+  { label: 'Customers', path: '/customers', icon: 'users' },
   {
     // Content CMS — PRD §38. Content and above manage Destinations and the
     // District / Category / Place taxonomy they depend on
-    // (DESTINATION.domain.contract.md §8). The same role list is applied to
-    // the routes in App.jsx; either way the backend `authorize()` middleware
-    // is the actual boundary (PRD §60).
+    // (DESTINATION.domain.contract.md §8).
     label: 'Destinations',
+    icon: 'compass',
     roles: [ROLES.CONTENT, ROLES.OPERATIONS, ROLES.ADMIN, ROLES.SUPER_ADMIN],
     children: [
       { label: 'Destinations', path: '/destinations' },
@@ -65,12 +68,13 @@ export const NAV_SECTIONS = [
       { label: 'Places', path: '/places' },
     ],
   },
-  { label: 'Hotels', path: '/hotels' },
-  { label: 'Transport', path: '/transport' },
-  { label: 'Activities', path: '/activities' },
-  { label: 'Blog', path: '/blog' },
+  { label: 'Hotels', path: '/hotels', icon: 'hotel' },
+  { label: 'Transport', path: '/transport', icon: 'truck' },
+  { label: 'Activities', path: '/activities', icon: 'sparkle' },
+  { label: 'Blog', path: '/blog', icon: 'fileText' },
   {
     label: 'Payments',
+    icon: 'creditCard',
     roles: [ROLES.FINANCE, ROLES.ADMIN, ROLES.SUPER_ADMIN],
     children: [
       { label: 'Transactions', path: '/payments/transactions' },
@@ -78,16 +82,18 @@ export const NAV_SECTIONS = [
       { label: 'Reconciliation', path: '/payments/reconciliation' },
     ],
   },
-  { label: 'Communications', path: '/communications' },
-  { label: 'Reports', path: '/reports' },
+  { label: 'Communications', path: '/communications', icon: 'messageSquare' },
+  { label: 'Reports', path: '/reports', icon: 'chart' },
   {
     label: 'Settings',
     path: '/settings',
+    icon: 'settings',
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     label: 'Audit Logs',
     path: '/audit-logs',
+    icon: 'shield',
     roles: [ROLES.SUPER_ADMIN],
   },
 ];

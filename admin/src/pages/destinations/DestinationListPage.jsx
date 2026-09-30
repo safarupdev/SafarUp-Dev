@@ -131,6 +131,7 @@ export default function DestinationListPage() {
         isLoading={query.isLoading}
         error={query.error}
         onRetry={query.refetch}
+        paginated={false}
         caption="Destinations, most recently updated first"
         empty={{
           title: status ? `No ${status.toLowerCase()} destinations` : 'No destinations yet',
